@@ -9,3 +9,4 @@ export { LessonCompleteModal } from "./LessonCompleteModal";
 export { DomainHub } from "./DomainHub";
 export { SettingsModal } from "./SettingsModal";
 export { BYOCModal } from "./BYOCModal";
+export { AIStudyHub } from "./AIStudyHub";

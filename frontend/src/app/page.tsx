@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import { AdaptiveChunkReader, SemanticChunkData } from "../components/AdaptiveChunkReader";
+import { AIStudyHub } from "../components/AIStudyHub";
 import { AuthModal, UserSession } from "../components/AuthModal";
 import { BYOCModal } from "../components/BYOCModal";
-import { DomainHub } from "../components/DomainHub";
 import { LessonCompleteModal } from "../components/LessonCompleteModal";
 import { SettingsModal } from "../components/SettingsModal";
 import { FRONTEND_CURRICULUM, TopicModule } from "../data/curriculum";
@@ -156,12 +156,11 @@ export default function Home() {
 
       {/* 2. Main Viewport */}
       <main className="flex-1">
-        {/* Domain Selection & Syllabus Hub */}
+        {/* AI Learning & Ingestion Hub (All-In BYOC & Synthesis) */}
         {currentView === "hub" && (
-          <DomainHub
+          <AIStudyHub
             onSelectTopic={handleSelectTopic}
             onOpenArena={() => setCurrentView("arena")}
-            onOpenBYOC={() => setIsBYOCOpen(true)}
           />
         )}
 

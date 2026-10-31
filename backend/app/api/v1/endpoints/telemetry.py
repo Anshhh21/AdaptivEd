@@ -144,3 +144,117 @@ async def evaluate_telemetry_http_fallback(
         message=f"Evaluated state: {evaluation.cognitive_state.value}",
     )
 
+
+class DynamicAdaptationRequest(AppBaseModel):
+    topic_title: str
+    content: str
+    misconception: Optional[str] = None
+    reason: str = "QUIZ_FAILURE_OR_OVERLOAD"
+
+
+class DynamicAdaptationResponse(AppBaseModel):
+    simplified_analogy: str
+    real_world_metaphor: str
+    step_by_step_walkthrough: list[str]
+    simplified_code_example: Optional[str] = None
+    mermaid_diagram: Optional[str] = None
+
+
+@router.post("/telemetry/adapt", response_model=ResponseEnvelope[DynamicAdaptationResponse], tags=["Telemetry"])
+async def generate_dynamic_adaptation(payload: DynamicAdaptationRequest) -> ResponseEnvelope[DynamicAdaptationResponse]:
+    """
+    Dynamic Behavioral Adaptation Endpoint:
+    When a learner struggles on a concept or answers incorrectly in a quiz,
+    invokes Gemini to synthesize a real-life everyday metaphor and simplified step-by-step model.
+    """
+    from app.core.config import get_settings
+    import httpx
+
+    settings = get_settings()
+    gemini_key = settings.GEMINI_API_KEY.get_secret_value()
+
+    system_instruction = (
+        "You are the Adaptive Pedagogical Simplifier for AdaptivEd, an advanced adaptive learning engine.\n"
+        "The learner is currently experiencing cognitive overload or answered the conceptual quiz incorrectly.\n"
+        "Your task is to re-explain this technical topic using a CRYSTAL-CLEAR, REAL-LIFE EVERYDAY METAPHOR "
+        "(e.g., cooking in a kitchen, a restaurant order ticket, a classroom whiteboard, traffic lights, or postal mail).\n\n"
+        "STRICT REQUIREMENTS:\n"
+        "1. Real-World Metaphor: Explain the concept entirely through the metaphor without dense jargon.\n"
+        "2. Step-by-Step Walkthrough: Exactly 3 simple, numbered steps in plain English.\n"
+        "3. Simplified Code Example: Provide a tiny 4-6 line minimal code example inside triple backticks.\n"
+        "4. Mermaid Diagram: A simple 3-node flowchart diagram.\n\n"
+        "Return STRICTLY a JSON object with this schema:\n"
+        "{\n"
+        '  "real_world_metaphor": "string (The story/analogy)",\n'
+        '  "simplified_analogy": "string (Why this maps directly to the code/concept)",\n'
+        '  "step_by_step_walkthrough": ["Step 1 explanation", "Step 2 explanation", "Step 3 explanation"],\n'
+        '  "simplified_code_example": "string (code inside markdown backticks)",\n'
+        '  "mermaid_diagram": "string (graph TD\\n  A --> B --> C)"\n'
+        "}"
+    )
+
+    prompt = (
+        f"{system_instruction}\n\n"
+        f"TOPIC TITLE: {payload.topic_title}\n"
+        f"ORIGINAL CONTENT:\n\"\"\"{payload.content[:3000]}\"\"\"\n"
+        f"USER MISCONCEPTION / REASON: {payload.misconception or payload.reason}\n"
+    )
+
+    if gemini_key and len(gemini_key) > 10:
+        api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={gemini_key}"
+        gemini_payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json", "temperature": 0.3},
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(api_url, json=gemini_payload)
+                if resp.status_code == 200:
+                    cand = (
+                        resp.json()
+                        .get("candidates", [{}])[0]
+                        .get("content", {})
+                        .get("parts", [{}])[0]
+                        .get("text", "")
+                    )
+                    if cand:
+                        data = json.loads(cand)
+                        return ResponseEnvelope(
+                            success=True,
+                            data=DynamicAdaptationResponse(
+                                real_world_metaphor=data.get("real_world_metaphor", "Real-world analogy"),
+                                simplified_analogy=data.get("simplified_analogy", "Simplified mapping"),
+                                step_by_step_walkthrough=data.get(
+                                    "step_by_step_walkthrough",
+                                    ["Observe initial state", "Apply mutation cleanly", "UI updates smoothly"],
+                                ),
+                                simplified_code_example=data.get("simplified_code_example"),
+                                mermaid_diagram=data.get("mermaid_diagram"),
+                            ),
+                            message="Adaptive real-world analogy synthesized successfully.",
+                        )
+        except Exception as e:
+            logger.warning(f"Gemini dynamic adaptation failed ({e}). Using heuristic fallback.")
+
+    # Rule-based fallback
+    return ResponseEnvelope(
+        success=True,
+        data=DynamicAdaptationResponse(
+            real_world_metaphor=(
+                f"Think of {payload.topic_title} like a restaurant kitchen order ticket: "
+                "instead of cooking food randomly on the spot, you write down an order (state), and the kitchen prepares exactly what's on the ticket."
+            ),
+            simplified_analogy="When you request an update, the system records your request and batches the preparation so nothing spills over.",
+            step_by_step_walkthrough=[
+                "Step 1: Set up the initial starting condition.",
+                "Step 2: Trigger an action when an event occurs.",
+                "Step 3: The system renders the new view automatically without manual repainting.",
+            ],
+            simplified_code_example=None,
+            mermaid_diagram="graph TD\n  Action[User Click / Trigger] --> State[Update Memory]\n  State --> View[Re-render Screen Cleanly]",
+        ),
+        message="Heuristic adaptation delivered.",
+    )
+
+

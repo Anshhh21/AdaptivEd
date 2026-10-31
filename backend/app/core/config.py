@@ -52,13 +52,20 @@ class Settings(BaseSettings):
     )
     DATABASE_NAME: str = Field(default="adaptived_db", min_length=1)
 
+    # Google Gemini AI Inference
+    GEMINI_API_KEY: SecretStr = Field(
+        default=SecretStr(""),
+        description="Google Gemini API Key for long-context document ingestion and multimodal curriculum synthesis.",
+    )
+    GEMINI_MODEL: str = "gemini-3.5-flash-lite"
+
     # AI & Multi-Agent Inference (Groq Cloud)
     GROQ_API_KEY: SecretStr = Field(
         default=SecretStr("gsk_placeholder_replace_with_valid_key"),
         description="API Key for Groq LLaMA-3.3-70B high-throughput inference.",
     )
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
-    GROQ_MAX_TOKENS: int = 2048
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
+    GROQ_MAX_TOKENS: int = 4096
     GROQ_TEMPERATURE: float = Field(default=0.2, ge=0.0, le=1.0)
 
     # Telemetry Engine Thresholds

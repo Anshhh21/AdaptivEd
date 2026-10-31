@@ -7,6 +7,7 @@ import { useFullscreenLock } from "../hooks/useFullscreenLock";
 import { BCSEvaluationResponse, ChunkTelemetryPayload, CognitiveState } from "../types/telemetry";
 import { DeveloperXRayDrawer } from "./DeveloperXRayDrawer";
 import { FocusLockShield } from "./FocusLockShield";
+import { MarkdownCodeRenderer } from "./MarkdownCodeRenderer";
 import { WebcamAttentionTile } from "./WebcamAttentionTile";
 
 export interface SemanticChunkData {
@@ -51,6 +52,20 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
 }) => {
   const [activeChunkIndex, setActiveChunkIndex] = useState<number>(0);
   const [activeViewMode, setActiveViewMode] = useState<"ORIGINAL" | "ADAPTED">("ORIGINAL");
+  const [isAdaptiveAssistanceActive, setIsAdaptiveAssistanceActive] = useState<boolean>(false);
+  const [dynamicAdaptations, setDynamicAdaptations] = useState<
+    Record<
+      number,
+      {
+        real_world_metaphor: string;
+        simplified_analogy: string;
+        step_by_step_walkthrough: string[];
+        simplified_code_example?: string | null;
+        mermaid_diagram?: string | null;
+      }
+    >
+  >({});
+  const [isGeneratingAdaptation, setIsGeneratingAdaptation] = useState<boolean>(false);
   const [activeEvaluation, setActiveEvaluation] = useState<BCSEvaluationResponse | null>(null);
   const [isXRayOpen, setIsXRayOpen] = useState<boolean>(false);
 
@@ -154,10 +169,72 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
     }
   };
 
+  // Interactive in-line comprehension checkpoint state ("Judge What You Learned")
+  const [inlineAnswers, setInlineAnswers] = useState<Record<number, number | null>>({});
+  const [inlineVerified, setInlineVerified] = useState<Record<number, boolean>>({});
+  const [inlineFeedback, setInlineFeedback] = useState<Record<number, { isCorrect: boolean; text: string }>>({});
+
+  const handleSelectInlineOption = (optIdx: number) => {
+    setInlineAnswers((prev) => ({ ...prev, [activeChunkIndex]: optIdx }));
+  };
+
+  const handleVerifyInlineAnswer = async () => {
+    const selected = inlineAnswers[activeChunkIndex];
+    const speedCheck = currentChunk?.speed_check;
+    if (selected === undefined || selected === null || !speedCheck) return;
+
+    const isCorrect = selected === speedCheck.correct_option_index;
+    setInlineVerified((prev) => ({ ...prev, [activeChunkIndex]: true }));
+    setInlineFeedback((prev) => ({
+      ...prev,
+      [activeChunkIndex]: {
+        isCorrect,
+        text: isCorrect
+          ? `✓ Verified! ${speedCheck.explanation}`
+          : `✗ Review needed. Correct answer is Option ${speedCheck.correct_option_index + 1}: "${speedCheck.options[speedCheck.correct_option_index]}". ${speedCheck.explanation}`,
+      },
+    }));
+
+    // If incorrect, automatically activate real-world analogy adaptive mode
+    if (!isCorrect) {
+      setIsAdaptiveAssistanceActive(true);
+      setActiveViewMode("ADAPTED");
+
+      // Check if we need to fetch a fresh Gemini real-world analogy
+      if (!currentChunk.cached_adaptations?.["OVERLOAD_SIMPLIFIED"] && !dynamicAdaptations[activeChunkIndex]) {
+        setIsGeneratingAdaptation(true);
+        try {
+          const res = await fetch("http://127.0.0.1:8000/api/v1/telemetry/adapt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              topic_title: currentChunk.title || lessonTitle,
+              content: currentChunk.content,
+              misconception: `User selected: "${speedCheck.options[selected]}"`,
+              reason: "QUIZ_CHECKPOINT_FAILED",
+            }),
+          });
+          const json = await res.json();
+          if (json.success && json.data) {
+            setDynamicAdaptations((prev) => ({
+              ...prev,
+              [activeChunkIndex]: json.data,
+            }));
+          }
+        } catch (err) {
+          console.warn("Failed to generate dynamic Gemini analogy:", err);
+        } finally {
+          setIsGeneratingAdaptation(false);
+        }
+      }
+    }
+  };
+
   const handleNextChunk = () => {
     if (activeChunkIndex < chunks.length - 1) {
       setActiveChunkIndex((prev) => prev + 1);
-      setActiveViewMode("ORIGINAL");
+      // If student is in adaptive assistance mode, maintain simplified analogies for subsequent topics
+      setActiveViewMode(isAdaptiveAssistanceActive ? "ADAPTED" : "ORIGINAL");
       setIsSpeedCheckPassed(false);
       setSelectedOption(null);
       setQuizError(null);
@@ -245,51 +322,213 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
       {/* 3. Main Reading Area (Minimalist Typography) */}
       <main className="flex-1 max-w-2xl w-full mx-auto px-6 py-12 flex flex-col justify-between">
         <div ref={containerRef} className="space-y-6">
-          {/* Chunk Header */}
-          <div className="flex items-center justify-between border-b border-slate-900 pb-4">
+          {/* Chunk Header with Explicit Learning Mode Switcher */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-900 pb-4">
             <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
               {currentChunk.title || `Concept Section ${activeChunkIndex + 1}`}
             </h1>
 
-            {/* Adaptation Morph Toggle */}
-            {adaptation && (
+            {/* Mode Toggle: Technical Deep Dive vs Real-World Analogy */}
+            <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-semibold shrink-0">
               <button
-                onClick={() =>
-                  setActiveViewMode((prev) => (prev === "ORIGINAL" ? "ADAPTED" : "ORIGINAL"))
-                }
-                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 transition flex items-center gap-1.5 cursor-pointer"
+                type="button"
+                onClick={() => setActiveViewMode("ORIGINAL")}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                  activeViewMode === "ORIGINAL"
+                    ? "bg-indigo-600 text-white shadow"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
               >
-                <span>{activeViewMode === "ORIGINAL" ? "Visual Analogy" : "Deep Dive"}</span>
+                <span>📘</span>
+                <span>Code & Deep Dive</span>
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => setActiveViewMode("ADAPTED")}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                  activeViewMode === "ADAPTED"
+                    ? "bg-amber-600 text-white shadow"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <span>💡</span>
+                <span>Real-Life Analogy</span>
+              </button>
+            </div>
           </div>
 
-          {/* Dynamic Content View (Original vs Morphed Analogy) */}
+          {/* Active Adaptive Assistance Banner */}
+          {isAdaptiveAssistanceActive && (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs flex items-center justify-between animate-fadeIn">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                <span>
+                  <strong>Adaptive Assistance Active:</strong> Based on your recent answers, we are using simpler real-life analogies and intuitive step-by-step breakdowns.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAdaptiveAssistanceActive(false)}
+                className="text-[11px] text-amber-400 hover:text-white underline cursor-pointer ml-3 shrink-0"
+              >
+                Reset Standard
+              </button>
+            </div>
+          )}
+
+          {/* Dynamic Content View (Original vs Morphed Real-World Analogy) */}
           {activeViewMode === "ORIGINAL" ? (
-            <div className="prose prose-invert prose-slate max-w-none text-slate-200 text-base leading-relaxed space-y-4">
-              <p>{currentChunk.content}</p>
+            <div className="space-y-4">
+              <MarkdownCodeRenderer content={currentChunk.content} />
             </div>
           ) : (
             <div className="space-y-6 animate-fadeIn">
-              <div className="p-6 rounded-2xl bg-indigo-950/20 border border-indigo-500/20 text-slate-200">
-                <div className="text-xs font-semibold uppercase tracking-wider text-indigo-400 mb-2">
-                  Cognitive Adaptation: Visual Analogy
+              {isGeneratingAdaptation ? (
+                <div className="p-8 rounded-2xl bg-slate-900/60 border border-indigo-500/30 text-center space-y-3">
+                  <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-xs font-semibold text-indigo-300">
+                    Gemini AI is crafting a real-life analogy for this topic...
+                  </p>
                 </div>
-                <div className="prose prose-invert max-w-none text-sm text-slate-300 whitespace-pre-line">
-                  {adaptation?.simplified_markdown}
-                </div>
-              </div>
-
-              {adaptation?.mermaid_diagram && (
-                <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 text-center font-mono text-xs text-indigo-300">
-                  <div className="text-slate-400 text-xs mb-3 font-sans">
-                    Architecture Workflow (Mermaid)
+              ) : dynamicAdaptations[activeChunkIndex] ? (
+                /* Dynamically generated Gemini real-world metaphor */
+                <div className="space-y-6">
+                  <div className="p-6 rounded-2xl bg-gradient-to-br from-amber-950/20 to-slate-900 border border-amber-500/30 text-slate-200 space-y-3 shadow-xl">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px] font-bold uppercase tracking-wider">
+                      💡 Real-World Metaphor
+                    </div>
+                    <p className="text-sm sm:text-base leading-relaxed text-amber-100 font-medium">
+                      {dynamicAdaptations[activeChunkIndex].real_world_metaphor}
+                    </p>
+                    <p className="text-xs text-slate-400 leading-relaxed pt-1">
+                      {dynamicAdaptations[activeChunkIndex].simplified_analogy}
+                    </p>
                   </div>
-                  <pre className="text-left bg-slate-950 p-4 rounded-xl border border-slate-800/80 overflow-x-auto text-emerald-400">
-                    {adaptation.mermaid_diagram}
-                  </pre>
+
+                  {/* 3-Step Walkthrough */}
+                  {dynamicAdaptations[activeChunkIndex].step_by_step_walkthrough?.length > 0 && (
+                    <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+                      <div className="text-xs font-bold uppercase tracking-wider text-indigo-400">
+                        Plain-English 3-Step Walkthrough
+                      </div>
+                      <div className="space-y-2">
+                        {dynamicAdaptations[activeChunkIndex].step_by_step_walkthrough.map((step, sIdx) => (
+                          <div key={sIdx} className="flex items-start gap-3 p-2.5 rounded-xl bg-slate-950 text-xs text-slate-300">
+                            <span className="w-5 h-5 rounded-full bg-indigo-500/20 text-indigo-400 font-bold flex items-center justify-center shrink-0">
+                              {sIdx + 1}
+                            </span>
+                            <span className="leading-5">{step}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Simplified Code Example */}
+                  {dynamicAdaptations[activeChunkIndex].simplified_code_example && (
+                    <div className="space-y-2">
+                      <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                        Ultra-Simple Code Example
+                      </div>
+                      <MarkdownCodeRenderer content={dynamicAdaptations[activeChunkIndex].simplified_code_example || ""} />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Pre-cached adaptation fallback */
+                <div className="space-y-6">
+                  <div className="p-6 rounded-2xl bg-indigo-950/20 border border-indigo-500/20 text-slate-200">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-indigo-400 mb-2">
+                      Cognitive Adaptation: Visual Analogy
+                    </div>
+                    <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">
+                      {adaptation?.simplified_markdown ||
+                        "Think of this concept like an everyday kitchen receipt or classroom whiteboard: states change in memory first, and the display reflects the new values cleanly."}
+                    </div>
+                  </div>
+
+                  {adaptation?.mermaid_diagram && (
+                    <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 text-center font-mono text-xs text-indigo-300">
+                      <div className="text-slate-400 text-xs mb-3 font-sans">
+                        Architecture Workflow (Mermaid)
+                      </div>
+                      <pre className="text-left bg-slate-950 p-4 rounded-xl border border-slate-800/80 overflow-x-auto text-emerald-400">
+                        {adaptation.mermaid_diagram}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Interactive Topic Comprehension Checkpoint ("Judge What You Learned") */}
+          {currentChunk.speed_check && (
+            <div className="mt-10 p-6 rounded-2xl bg-indigo-950/20 border border-indigo-500/30 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-300">
+                    Comprehension Checkpoint: Judge What You Learned
+                  </span>
+                </div>
+                {inlineVerified[activeChunkIndex] && inlineFeedback[activeChunkIndex]?.isCorrect && (
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold">
+                    ✓ Verified Comprehension
+                  </span>
+                )}
+              </div>
+
+              <h4 className="text-base font-bold text-white leading-snug">
+                {currentChunk.speed_check.question}
+              </h4>
+
+              <div className="space-y-2 pt-1">
+                {currentChunk.speed_check.options.map((opt, optIdx) => {
+                  const isSelected = inlineAnswers[activeChunkIndex] === optIdx;
+                  return (
+                    <button
+                      key={optIdx}
+                      type="button"
+                      onClick={() => handleSelectInlineOption(optIdx)}
+                      className={`w-full text-left p-3.5 rounded-xl text-xs sm:text-sm border transition flex items-center justify-between cursor-pointer ${
+                        isSelected
+                          ? "border-indigo-500 bg-indigo-600/20 text-white font-medium shadow-md shadow-indigo-500/10"
+                          : "border-slate-800 bg-slate-950/80 text-slate-300 hover:border-slate-700"
+                      }`}
+                    >
+                      <span>{opt}</span>
+                      {isSelected && (
+                        <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0 ml-2"></span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Feedback Alert */}
+              {inlineFeedback[activeChunkIndex] && (
+                <div
+                  className={`p-3.5 rounded-xl text-xs leading-relaxed ${
+                    inlineFeedback[activeChunkIndex].isCorrect
+                      ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-300"
+                      : "bg-amber-500/10 border border-amber-500/20 text-amber-300"
+                  }`}
+                >
+                  {inlineFeedback[activeChunkIndex].text}
+                </div>
+              )}
+
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={handleVerifyInlineAnswer}
+                  disabled={inlineAnswers[activeChunkIndex] === undefined || inlineAnswers[activeChunkIndex] === null}
+                  className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-xs transition disabled:opacity-40 cursor-pointer shadow-md shadow-indigo-600/20"
+                >
+                  {inlineVerified[activeChunkIndex] ? "Re-evaluate Answer" : "Judge My Answer →"}
+                </button>
+              </div>
             </div>
           )}
         </div>
