@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import AnimatedContent from "./AnimatedContent";
+import MagicBento from "./MagicBento";
 import RubberSegment from "./RubberSegment";
 import SpecularButton from "./SpecularButton";
 import { TopicModule } from "../types/curriculum";
@@ -218,7 +219,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-10">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-12">
       {/* 1. Minimal Header */}
       <AnimatedContent distance={20} duration={0.6} ease="power3.out" trigger="mount">
         <div className="text-center space-y-2.5 max-w-2xl mx-auto">
@@ -528,16 +529,16 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
         </div>
       </AnimatedContent>
 
-      {/* 3. Instant Ingestion Starters */}
-      <AnimatedContent distance={30} delay={0.2} duration={0.7} ease="power3.out" trigger="mount">
-        <div className="space-y-3">
+      {/* 3. MagicBento Interactive Grid Layout */}
+      <AnimatedContent distance={30} delay={0.2} duration={0.8} ease="power3.out" trigger="mount">
+        <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-semibold text-white tracking-tight flex items-center gap-2">
-                <span>Quick Starters</span>
+              <h3 className="text-base font-semibold text-white tracking-tight">
+                Adaptive Capabilities & Instant Tracks
               </h3>
               <p className="text-xs text-slate-400 font-light">
-                Select any verified documentation to generate a course immediately.
+                Hover to illuminate with cursor light. Click any track to auto-load documentation.
               </p>
             </div>
             <button
@@ -549,82 +550,93 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("url");
-                setUrlInput("https://www.geeksforgeeks.org/css/introduction-to-tailwind-css/");
-                setCustomTitle("Tailwind CSS Architecture & Utility Classes");
-              }}
-              className="p-3.5 rounded-2xl bg-black/30 hover:bg-black/40 border border-white/10 hover:border-white/20 text-left space-y-1.5 transition cursor-pointer backdrop-blur-md group"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">
-                  GeeksforGeeks
-                </span>
-                <span className="text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition">
-                  Load →
-                </span>
-              </div>
-              <h5 className="text-xs font-semibold text-white group-hover:text-purple-300 transition">
-                Tailwind CSS
-              </h5>
-              <p className="text-[11px] text-slate-400 truncate">
-                https://www.geeksforgeeks.org/css/introduction-to-tailwind-css/
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("url");
-                setUrlInput("https://www.w3schools.com/js/");
-                setCustomTitle("JavaScript Core Engine & Modern ES6+");
-              }}
-              className="p-3.5 rounded-2xl bg-black/30 hover:bg-black/40 border border-white/10 hover:border-white/20 text-left space-y-1.5 transition cursor-pointer backdrop-blur-md group"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 font-medium">
-                  W3Schools
-                </span>
-                <span className="text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition">
-                  Load →
-                </span>
-              </div>
-              <h5 className="text-xs font-semibold text-white group-hover:text-purple-300 transition">
-                JavaScript Core
-              </h5>
-              <p className="text-[11px] text-slate-400 truncate">
-                https://www.w3schools.com/js/
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab("url");
-                setUrlInput("https://www.w3schools.com/react/default.asp");
-                setCustomTitle("React 19 Hooks & State Architecture");
-              }}
-              className="p-3.5 rounded-2xl bg-black/30 hover:bg-black/40 border border-white/10 hover:border-white/20 text-left space-y-1.5 transition cursor-pointer backdrop-blur-md group"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 font-medium">
-                  W3Schools
-                </span>
-                <span className="text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition">
-                  Load →
-                </span>
-              </div>
-              <h5 className="text-xs font-semibold text-white group-hover:text-purple-300 transition">
-                React Hooks
-              </h5>
-              <p className="text-[11px] text-slate-400 truncate">
-                https://www.w3schools.com/react/default.asp
-              </p>
-            </button>
-          </div>
+          <MagicBento
+            columns={4}
+            rowHeight={195}
+            gap={14}
+            radius={20}
+            theme="dark"
+            glowColor="#c084fc"
+            enableBorderGlow={true}
+            enableSpotlight={true}
+            spotlightRadius={300}
+            clickEffect={true}
+            enableStars={true}
+            particleCount={20}
+            items={[
+              {
+                id: 'synthesis',
+                label: 'Gemini 3.5 Pipeline',
+                title: 'Tailwind CSS Architecture',
+                description: 'Auto-extracts design tokens, layout utility classes, and removes fluff.',
+                visual: 'automation',
+                colSpan: 2,
+                rowSpan: 2,
+                onClick: () => {
+                  setActiveTab('url');
+                  setUrlInput('https://www.geeksforgeeks.org/css/introduction-to-tailwind-css/');
+                  setCustomTitle('Tailwind CSS Architecture & Utility Classes');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              },
+              {
+                id: 'javascript',
+                label: 'Core Runtime',
+                title: 'JavaScript Deep Dive',
+                description: 'Prototypes, execution context, event loop, and closures step-by-step.',
+                visual: 'collaboration',
+                colSpan: 2,
+                rowSpan: 2,
+                onClick: () => {
+                  setActiveTab('url');
+                  setUrlInput('https://www.w3schools.com/js/');
+                  setCustomTitle('JavaScript Core Engine & Modern ES6+');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              },
+              {
+                id: 'analytics',
+                label: 'Telemetry',
+                title: 'Live Focus & Dwell',
+                description: 'Real-time BCS attention scoring & dwell benchmarks.',
+                visual: 'analytics',
+                onClick: () => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              },
+              {
+                id: 'dashboard',
+                label: 'Capability',
+                title: 'Difficulty Scaling',
+                description: 'Dynamic adaptation from 1.0 to 10.0 level.',
+                visual: 'dashboard',
+                onClick: () => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              },
+              {
+                id: 'integration',
+                label: 'Universal Ingestion',
+                title: 'React 19 Concurrency',
+                description: 'Hooks, Suspense boundaries, and Server Actions.',
+                visual: 'integration',
+                onClick: () => {
+                  setActiveTab('url');
+                  setUrlInput('https://www.w3schools.com/react/default.asp');
+                  setCustomTitle('React 19 Hooks & State Architecture');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              },
+              {
+                id: 'verification',
+                label: 'Phase 6 Defense',
+                title: 'Verification Arena',
+                description: 'Zero-clone audit, live Vercel check, and viva code defense.',
+                visual: 'security',
+                onClick: onOpenArena
+              }
+            ]}
+          />
         </div>
       </AnimatedContent>
 
