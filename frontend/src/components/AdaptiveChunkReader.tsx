@@ -12,6 +12,7 @@ import { DeveloperXRayDrawer } from "./DeveloperXRayDrawer";
 import { FocusLockShield } from "./FocusLockShield";
 import { MarkdownCodeRenderer } from "./MarkdownCodeRenderer";
 import { WebcamAttentionTile } from "./WebcamAttentionTile";
+import { API_BASE_URL, getWsTelemetryUrl } from "../config/api";
 
 export interface SemanticChunkData {
   id: string;
@@ -139,9 +140,7 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.hostname === "localhost" ? "localhost:8000" : window.location.host;
-    const wsUrl = `${protocol}//${host}/api/v1/ws/telemetry/${learnerId}`;
+    const wsUrl = getWsTelemetryUrl(learnerId);
 
     let ws: WebSocket | null = null;
     try {
@@ -244,7 +243,7 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
 
     // Persist dynamic 1.0 - 10.0 comprehension score directly to MongoDB Atlas
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/v1/auth/progress", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/progress`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -300,7 +299,7 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
       if (!currentChunk.cached_adaptations?.["OVERLOAD_SIMPLIFIED"] && !dynamicAdaptations[activeChunkIndex]) {
         setIsGeneratingAdaptation(true);
         try {
-          const res = await fetch("http://127.0.0.1:8000/api/v1/telemetry/adapt", {
+          const res = await fetch(`${API_BASE_URL}/api/v1/telemetry/adapt`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

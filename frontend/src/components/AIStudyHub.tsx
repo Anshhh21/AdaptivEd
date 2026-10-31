@@ -8,6 +8,7 @@ import SpecularButton from "./SpecularButton";
 import { TopicModule } from "../types/curriculum";
 import { SemanticChunkData } from "./AdaptiveChunkReader";
 import { UserSession } from "./AuthModal";
+import { API_BASE_URL } from "../config/api";
 
 interface AIStudyHubProps {
   onSelectTopic: (topic: TopicModule, techName: string) => void;
@@ -44,7 +45,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
       onUpdateSession(updated);
       try {
         localStorage.setItem("adaptived_user", JSON.stringify(updated));
-        await fetch("http://127.0.0.1:8000/api/v1/auth/strategy", {
+        await fetch(`${API_BASE_URL}/api/v1/auth/strategy`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -118,7 +119,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
 
       if (activeTab === "url") {
         setLoadingStep("Accessing page and filtering boilerplate...");
-        response = await fetch("http://127.0.0.1:8000/api/v1/byoc/ingest-url", {
+        response = await fetch(`${API_BASE_URL}/api/v1/byoc/ingest-url`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -136,13 +137,13 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
         formData.append("user_level", currentScore.toString());
         formData.append("learning_strategy", strategy);
 
-        response = await fetch("http://127.0.0.1:8000/api/v1/byoc/ingest-document", {
+        response = await fetch(`${API_BASE_URL}/api/v1/byoc/ingest-document`, {
           method: "POST",
           body: formData,
         });
       } else {
         setLoadingStep("Structuring notes into step-by-step explanations...");
-        response = await fetch("http://127.0.0.1:8000/api/v1/byoc/ingest-notes", {
+        response = await fetch(`${API_BASE_URL}/api/v1/byoc/ingest-notes`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

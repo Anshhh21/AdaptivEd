@@ -5,6 +5,7 @@ import AnimatedContent from "../components/AnimatedContent";
 import { AdaptiveChunkReader } from "../components/AdaptiveChunkReader";
 import { AIStudyHub } from "../components/AIStudyHub";
 import { AuthModal, UserSession } from "../components/AuthModal";
+import { API_BASE_URL } from "../config/api";
 import GradientWaves from "../components/GradientWaves";
 import { LessonCompleteModal } from "../components/LessonCompleteModal";
 import { SettingsModal } from "../components/SettingsModal";
@@ -71,7 +72,7 @@ export default function Home() {
       localStorage.setItem("adaptived_user", JSON.stringify(updated));
 
       // Persist progress to MongoDB Atlas
-      fetch("http://127.0.0.1:8000/api/v1/auth/progress", {
+      fetch(`${API_BASE_URL}/api/v1/auth/progress`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

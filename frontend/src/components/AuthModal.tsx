@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { API_BASE_URL } from "../config/api";
 
 export interface UserSession {
   user_id: string;
@@ -77,7 +78,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setErrorMsg(null);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/v1/auth/google", {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -146,7 +147,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               password: password,
             };
 
-      const res = await fetch(`http://127.0.0.1:8000${endpoint}`, {
+      const res = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
