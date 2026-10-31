@@ -66,9 +66,11 @@ def create_application() -> FastAPI:
     )
 
     # Cross-Origin Resource Sharing (CORS) Configuration
+    # Automatically permits localhost dev and any *.vercel.app preview or production deployment
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
+        allow_origins=settings.CORS_ORIGINS if settings.CORS_ORIGINS != ["*"] else ["*"],
+        allow_origin_regex=r"^https://.*\.vercel\.app$" if settings.CORS_ORIGINS != ["*"] else None,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
