@@ -13,6 +13,14 @@ from app.ml.ablation import (
     FixedSentenceChunker,
     TfidfLsaChunker,
 )
+from app.ml.scoring import (
+    BCSEngine,
+    BCSEvaluation,
+    ChunkContext,
+    ChunkTelemetryTick,
+    CognitiveState,
+    LearnerContext,
+)
 
 __all__ = [
     "BaseChunker",
@@ -26,4 +34,10 @@ __all__ = [
     "AblationEvaluator",
     "AblationMetrics",
     "AblationComparisonReport",
+    "CognitiveState",
+    "ChunkTelemetryTick",
+    "ChunkContext",
+    "LearnerContext",
+    "BCSEvaluation",
+    "BCSEngine",
 ]
