@@ -54,7 +54,7 @@ class ArchitecturalVivaQuestion(AppBaseModel):
 
     question_id: str
     file_reference: str = Field(description="Exact filename referenced, e.g. 'hooks/useSession.ts'")
-    line_reference: Optional[str] = Field(description="e.g. 'lines 24-41'")
+    line_reference: Optional[str] = Field(default=None, description="e.g. 'lines 24-41'")
     question: str
     rubric_guidelines: List[str]
     time_limit_seconds: int = 120

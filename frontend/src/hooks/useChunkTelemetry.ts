@@ -12,7 +12,7 @@ interface UseChunkTelemetryProps {
 }
 
 interface UseChunkTelemetryReturn {
-  containerRef: React.RefObject<HTMLDivElement | null>;
+  containerRef: React.RefObject<HTMLDivElement>;
   payload: ChunkTelemetryPayload;
   resetTelemetry: () => void;
   recordAttentionScore: (score: number | null) => void;
@@ -36,7 +36,7 @@ export function useChunkTelemetry({
   flushIntervalMs = 1000,
   onTick,
 }: UseChunkTelemetryProps): UseChunkTelemetryReturn {
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null!);
 
   // Buffered telemetry metrics held in refs to prevent render thrashing
   const dwellTimeMsRef = useRef<number>(0);
