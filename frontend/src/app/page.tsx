@@ -1,26 +1,22 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { AdaptiveChunkReader, SemanticChunkData } from "../components/AdaptiveChunkReader";
+import { AdaptiveChunkReader } from "../components/AdaptiveChunkReader";
 import { AIStudyHub } from "../components/AIStudyHub";
 import { AuthModal, UserSession } from "../components/AuthModal";
-import { BYOCModal } from "../components/BYOCModal";
 import { LessonCompleteModal } from "../components/LessonCompleteModal";
 import { SettingsModal } from "../components/SettingsModal";
-import { FRONTEND_CURRICULUM, TopicModule } from "../data/curriculum";
+import { TopicModule } from "../types/curriculum";
 
 export default function Home() {
   const [currentView, setCurrentView] = useState<"hub" | "reader" | "arena">("hub");
-  const [selectedTopic, setSelectedTopic] = useState<TopicModule>(
-    FRONTEND_CURRICULUM[0].topics[0]
-  );
-  const [selectedTechTitle, setSelectedTechTitle] = useState<string>("CSS Architecture");
+  const [selectedTopic, setSelectedTopic] = useState<TopicModule | null>(null);
+  const [selectedTechTitle, setSelectedTechTitle] = useState<string>("Adaptive Topic");
 
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isCompleteOpen, setIsCompleteOpen] = useState<boolean>(false);
-  const [isBYOCOpen, setIsBYOCOpen] = useState<boolean>(false);
 
   // Load user session on mount
   useEffect(() => {
@@ -57,8 +53,8 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           user_id: userSession.user_id,
-          lesson_id: selectedTopic.id,
-          track_id: selectedTopic.slug,
+          lesson_id: selectedTopic?.id || "adaptive-lesson",
+          track_id: selectedTopic?.slug || "general",
           xp_earned: 150,
           bcs_score: 0.92,
         }),
@@ -96,19 +92,8 @@ export default function Home() {
           </div>
         </button>
 
-        {/* Right Action Icons: BYOC, Settings & Account */}
+        {/* Right Action Icons: Settings & Account */}
         <div className="flex items-center gap-3">
-          {/* BYOC Upload Shortcut */}
-          <button
-            onClick={() => setIsBYOCOpen(true)}
-            type="button"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 text-xs font-semibold transition cursor-pointer"
-            title="Upload custom study notes, markdown or PDF"
-          >
-            <span>📄</span>
-            <span className="hidden sm:inline">Upload Notes (BYOC)</span>
-          </button>
-
           {/* Settings Button (Ablation Studio lives inside here) */}
           <button
             onClick={() => setIsSettingsOpen(true)}
@@ -170,20 +155,32 @@ export default function Home() {
             <div className="max-w-2xl mx-auto px-6 pt-4 flex items-center justify-between text-xs text-slate-400">
               <button
                 onClick={() => setCurrentView("hub")}
-                className="hover:text-white transition flex items-center gap-1.5 cursor-pointer"
+                className="hover:text-white transition flex items-center gap-1.5 cursor-pointer font-medium"
               >
-                <span>← Back to Topics Syllabus</span>
+                <span>← Back to AI Learning Hub</span>
               </button>
               <span className="font-mono text-indigo-400">{selectedTechTitle}</span>
             </div>
 
-            <AdaptiveChunkReader
-              lessonId={selectedTopic.slug}
-              lessonTitle={selectedTopic.title}
-              chunks={selectedTopic.chunks}
-              learnerId={userSession?.user_id || "learner_anonymous"}
-              onLessonComplete={handleLessonComplete}
-            />
+            {selectedTopic ? (
+              <AdaptiveChunkReader
+                lessonId={selectedTopic.slug}
+                lessonTitle={selectedTopic.title}
+                chunks={selectedTopic.chunks}
+                learnerId={userSession?.user_id || "learner_anonymous"}
+                onLessonComplete={handleLessonComplete}
+              />
+            ) : (
+              <div className="max-w-md mx-auto py-20 text-center space-y-4">
+                <p className="text-slate-400 text-sm">No active topic selected.</p>
+                <button
+                  onClick={() => setCurrentView("hub")}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white text-xs font-semibold cursor-pointer transition"
+                >
+                  Return to AI Learning Hub
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -276,17 +273,6 @@ export default function Home() {
         defaultMode="signup"
       />
 
-      {/* BYOC Upload Modal */}
-      <BYOCModal
-        isOpen={isBYOCOpen}
-        onClose={() => setIsBYOCOpen(false)}
-        onLaunchStudy={(topic, trackName) => {
-          setSelectedTopic(topic);
-          setSelectedTechTitle(trackName);
-          setCurrentView("reader");
-        }}
-      />
-
       {/* Settings Modal (Ablation Studio is housed here) */}
       <SettingsModal
         isOpen={isSettingsOpen}
@@ -296,7 +282,7 @@ export default function Home() {
       {/* Lesson Complete Celebration Modal */}
       <LessonCompleteModal
         isOpen={isCompleteOpen}
-        lessonTitle={selectedTopic.title}
+        lessonTitle={selectedTopic?.title || "Adaptive Topic"}
         streakDays={userSession?.current_streak_days || 1}
         onReturnToCatalog={() => {
           setIsCompleteOpen(false);

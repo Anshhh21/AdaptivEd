@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { TopicModule, FRONTEND_CURRICULUM } from "../data/curriculum";
+import { TopicModule } from "../types/curriculum";
 import { SemanticChunkData } from "./AdaptiveChunkReader";
 
 interface AIStudyHubProps {
@@ -372,15 +372,18 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({ onSelectTopic, onOpenAre
         </form>
       </div>
 
-      {/* 3. Quick-Start Pre-Calibrated Masterclasses */}
-      <div className="space-y-4">
+      {/* 3. Instant Ingestion Starters (Quick-populate real documentation links) */}
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold text-white tracking-tight">
-              Pre-Calibrated Deep Masterclasses
+            <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+              <span>⚡ Quick-Start Starters</span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-mono">
+                1-Click Ingest
+              </span>
             </h3>
             <p className="text-xs text-slate-400">
-              One-click instant access to 1-hour verified deep reads.
+              Click any starter to auto-fill verified documentation and synthesize with Gemini.
             </p>
           </div>
           <button
@@ -391,41 +394,81 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({ onSelectTopic, onOpenAre
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {FRONTEND_CURRICULUM.map((track) => (
-            <div
-              key={track.id}
-              className="rounded-2xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/40 p-5 flex flex-col justify-between space-y-4 transition-all duration-200"
-            >
-              <div className="space-y-2">
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 uppercase font-semibold">
-                  Verified Masterclass
-                </span>
-                <h4 className="text-base font-bold text-white">{track.name}</h4>
-                <p className="text-xs text-slate-400 leading-relaxed line-clamp-2">
-                  {track.description}
-                </p>
-              </div>
-
-              <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                <span className="text-[11px] font-mono text-slate-400 block">
-                  {track.topics.length} In-Depth Topic Modules
-                </span>
-                <div className="space-y-1">
-                  {track.topics.slice(0, 2).map((top) => (
-                    <button
-                      key={top.id}
-                      onClick={() => onSelectTopic(top, track.name)}
-                      className="w-full text-left text-xs p-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center justify-between cursor-pointer"
-                    >
-                      <span className="truncate">{top.title}</span>
-                      <span className="text-[10px] text-indigo-400">Study →</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("url");
+              setUrlInput("https://www.geeksforgeeks.org/css/introduction-to-tailwind-css/");
+              setCustomTitle("Tailwind CSS Architecture & Utility Classes");
+            }}
+            className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-900 text-left space-y-1.5 transition cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-semibold">
+                GeeksforGeeks
+              </span>
+              <span className="text-xs text-indigo-400 opacity-0 group-hover:opacity-100 transition">
+                Load Link →
+              </span>
             </div>
-          ))}
+            <h5 className="text-xs font-bold text-white group-hover:text-indigo-300 transition">
+              Tailwind CSS Masterclass
+            </h5>
+            <p className="text-[11px] text-slate-400 truncate">
+              https://www.geeksforgeeks.org/css/introduction-to-tailwind-css/
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("url");
+              setUrlInput("https://www.w3schools.com/js/");
+              setCustomTitle("JavaScript Core Engine & Modern ES6+");
+            }}
+            className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-900 text-left space-y-1.5 transition cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-semibold">
+                W3Schools
+              </span>
+              <span className="text-xs text-indigo-400 opacity-0 group-hover:opacity-100 transition">
+                Load Link →
+              </span>
+            </div>
+            <h5 className="text-xs font-bold text-white group-hover:text-indigo-300 transition">
+              JavaScript Complete Guide
+            </h5>
+            <p className="text-[11px] text-slate-400 truncate">
+              https://www.w3schools.com/js/
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("url");
+              setUrlInput("https://www.w3schools.com/react/default.asp");
+              setCustomTitle("React 19 Hooks & State Architecture");
+            }}
+            className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/50 hover:bg-slate-900 text-left space-y-1.5 transition cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 font-semibold">
+                W3Schools
+              </span>
+              <span className="text-xs text-indigo-400 opacity-0 group-hover:opacity-100 transition">
+                Load Link →
+              </span>
+            </div>
+            <h5 className="text-xs font-bold text-white group-hover:text-indigo-300 transition">
+              React Hooks & Components
+            </h5>
+            <p className="text-[11px] text-slate-400 truncate">
+              https://www.w3schools.com/react/default.asp
+            </p>
+          </button>
         </div>
       </div>
 

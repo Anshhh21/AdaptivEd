@@ -150,7 +150,9 @@ async def _synthesize_with_gemini(raw_text: str, fallback_title: str) -> Optiona
         "(at least 250-400 words) that teaches the core mechanisms, includes practical code snippets or technical diagrams "
         "where appropriate, and clarifies common pitfalls.\n"
         "4. JUDGE WHAT WAS LEARNT: For EACH topic, provide a Speed-Check multiple choice question to test whether the "
-        "student truly understood the material.\n\n"
+        "student truly understood the material.\n"
+        "5. CODE FORMATTING: Whenever providing code examples, ALWAYS wrap code in standard markdown code fences with a language tag on a separate line (e.g. ```jsx\\n<code here>\\n```). "
+        "Format code cleanly across multiple lines with standard indentation, NEVER output code as a single dense line.\n\n"
         "Return STRICTLY a JSON object matching this schema:\n"
         "{\n"
         '  "title": "string (Overall Course Title)",\n'
@@ -244,7 +246,9 @@ async def synthesize_curriculum_with_ai(raw_text: str, fallback_title: str) -> d
         "(at least 200-350 words) that teaches the core mechanisms, includes practical code snippets or technical diagrams "
         "where appropriate, and clarifies common pitfalls.\n"
         "4. JUDGE WHAT WAS LEARNT: For EACH topic, provide a Speed-Check multiple choice question to test whether the "
-        "student truly understood the material.\n\n"
+        "student truly understood the material.\n"
+        "5. CODE FORMATTING: Whenever providing code examples, ALWAYS wrap code in standard markdown code fences with a language tag on a separate line (e.g. ```jsx\\n<code here>\\n```). "
+        "Format code cleanly across multiple lines with standard indentation, NEVER output code as a single dense line.\n\n"
         "Return STRICTLY a JSON object matching this schema:\n"
         "{\n"
         '  "title": "string (Overall Course Title)",\n'

@@ -7,8 +7,8 @@ interface MarkdownCodeRendererProps {
 }
 
 export const MarkdownCodeRenderer: React.FC<MarkdownCodeRendererProps> = ({ content }) => {
-  // Split content by code blocks: ```[lang]\n[code]\n```
-  const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
+  // Split content by code blocks: ```[lang] ... ``` or ```\n ... \n```
+  const codeBlockRegex = /```(?:([a-zA-Z0-9_#-]+)[ \t]*)?(?:\r?\n|[ \t])([\s\S]*?)```/g;
 
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -63,10 +63,24 @@ interface CodeWindowProps {
   code: string;
 }
 
+function formatCodeIfSingleLine(rawCode: string): string {
+  const code = rawCode.trim();
+  if (code.includes("\n")) return code;
+
+  // Insert standard statement line breaks if code was generated on a single line
+  return code
+    .replace(/;\s*(import|const|let|var|function|return|export)/g, ";\n$1")
+    .replace(/(function\s+[a-zA-Z0-9_$]+\s*\([^)]*\)\s*\{)/g, "$1\n  ")
+    .replace(/(return\s*\()/g, "\n  $1")
+    .replace(/;(?=\s*[A-Za-z0-9_$])/g, ";\n")
+    .replace(/;\s*\}\s*/g, ";\n}\n")
+    .trim();
+}
+
 const CodeWindow: React.FC<CodeWindowProps> = ({ language, code }) => {
   const [copied, setCopied] = useState<boolean>(false);
 
-  const cleanCode = code.trim();
+  const cleanCode = formatCodeIfSingleLine(code);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(cleanCode);

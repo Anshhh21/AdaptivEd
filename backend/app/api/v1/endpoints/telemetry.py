@@ -14,7 +14,7 @@ from app.ml.scoring import (
 )
 from app.models.content import SemanticChunk
 from app.models.learner import LearnerProfile
-from app.schemas.base import ResponseEnvelope
+from app.schemas.base import AppBaseModel, ResponseEnvelope
 
 logger = logging.getLogger("adaptived.telemetry")
 router = APIRouter()

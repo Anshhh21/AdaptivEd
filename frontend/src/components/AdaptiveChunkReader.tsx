@@ -117,6 +117,11 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
   }, [attentionScore, recordAttentionScore]);
 
   // Connect WebSocket to FastAPI Telemetry Aggregator
+  const activeViewModeRef = useRef<"ORIGINAL" | "ADAPTED">(activeViewMode);
+  activeViewModeRef.current = activeViewMode;
+  const isSpeedCheckPassedRef = useRef<boolean>(isSpeedCheckPassed);
+  isSpeedCheckPassedRef.current = isSpeedCheckPassed;
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -124,37 +129,48 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
     const host = window.location.hostname === "localhost" ? "localhost:8000" : window.location.host;
     const wsUrl = `${protocol}//${host}/api/v1/ws/telemetry/${learnerId}`;
 
-    const ws = new WebSocket(wsUrl);
+    let ws: WebSocket | null = null;
+    try {
+      ws = new WebSocket(wsUrl);
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.score !== undefined) {
-          const evalRes = data as BCSEvaluationResponse;
-          setActiveEvaluation(evalRes);
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.score !== undefined) {
+            const evalRes = data as BCSEvaluationResponse;
+            setActiveEvaluation(evalRes);
 
-          // Handle automatic adaptation triggers
-          if (evalRes.requires_adaptation && activeViewMode === "ORIGINAL") {
-            setActiveViewMode("ADAPTED");
+            // Flag adaptation availability without forcing an intrusive view switch
+            if (evalRes.requires_adaptation) {
+              setIsAdaptiveAssistanceActive(true);
+            }
+
+            // Handle skimming speed-check triggers
+            if (evalRes.requires_speed_check && !isSpeedCheckPassedRef.current) {
+              setIsSpeedCheckOpen(true);
+            }
           }
-
-          // Handle skimming speed-check triggers
-          if (evalRes.requires_speed_check && !isSpeedCheckPassed) {
-            setIsSpeedCheckOpen(true);
-          }
+        } catch (err) {
+          console.warn("Telemetry socket parse error:", err);
         }
-      } catch (err) {
-        console.warn("Telemetry socket parse error:", err);
-      }
-    };
+      };
 
-    wsRef.current = ws;
+      ws.onerror = () => {
+        // Silently capture websocket error if offline/restarting
+      };
+
+      wsRef.current = ws;
+    } catch (e) {
+      console.warn("WebSocket initialization failed:", e);
+    }
 
     return () => {
-      ws.close();
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        ws.close();
+      }
       wsRef.current = null;
     };
-  }, [learnerId, activeViewMode, isSpeedCheckPassed]);
+  }, [learnerId]);
 
   // Handle speed-check answer submission
   const handleVerifyAnswer = () => {
@@ -195,10 +211,9 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
       },
     }));
 
-    // If incorrect, automatically activate real-world analogy adaptive mode
+    // If incorrect, flag adaptive assistance and fetch Gemini analogy in background without forcing a disruptive view switch
     if (!isCorrect) {
       setIsAdaptiveAssistanceActive(true);
-      setActiveViewMode("ADAPTED");
 
       // Check if we need to fetch a fresh Gemini real-world analogy
       if (!currentChunk.cached_adaptations?.["OVERLOAD_SIMPLIFIED"] && !dynamicAdaptations[activeChunkIndex]) {
@@ -233,8 +248,7 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
   const handleNextChunk = () => {
     if (activeChunkIndex < chunks.length - 1) {
       setActiveChunkIndex((prev) => prev + 1);
-      // If student is in adaptive assistance mode, maintain simplified analogies for subsequent topics
-      setActiveViewMode(isAdaptiveAssistanceActive ? "ADAPTED" : "ORIGINAL");
+      // Preserve the user's manual view mode preference without forcing tab flips
       setIsSpeedCheckPassed(false);
       setSelectedOption(null);
       setQuizError(null);
@@ -246,7 +260,6 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
   const handlePrevChunk = () => {
     if (activeChunkIndex > 0) {
       setActiveChunkIndex((prev) => prev - 1);
-      setActiveViewMode("ORIGINAL");
       setIsSpeedCheckPassed(false);
     }
   };

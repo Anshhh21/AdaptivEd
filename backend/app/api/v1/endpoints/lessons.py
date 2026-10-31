@@ -3,7 +3,6 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.models.content import Lesson, SemanticChunk, TrackTier
 from app.schemas.base import ResponseEnvelope
-from app.seeds.gold_tracks import seed_gold_tracks
 
 router = APIRouter()
 
@@ -59,13 +58,11 @@ async def get_lesson_with_chunks(slug: str) -> ResponseEnvelope[dict]:
 @router.post("/lessons/seed", response_model=ResponseEnvelope[dict], tags=["Lessons"])
 async def trigger_gold_tracks_seed() -> ResponseEnvelope[dict]:
     """
-    Seeds verified Gold Tracks (React, Next.js, MongoDB) into the database.
-    Idempotent: skips already-seeded lessons.
+    Deprecated: The platform is 100% universal AI ingestion driven via /api/v1/byoc/upload.
     """
-    count = await seed_gold_tracks()
     return ResponseEnvelope(
         success=True,
-        data={"seeded_count": count},
-        message=f"Seeding completed. {count} new Gold Tracks registered.",
+        data={"seeded_count": 0},
+        message="Pre-calibrated tracks deprecated. Use universal AI Ingestion (/api/v1/byoc/upload).",
     )
 
