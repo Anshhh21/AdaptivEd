@@ -33,3 +33,4 @@ export function getWsTelemetryUrl(learnerId: string): string {
 
   return `ws://localhost:8000/api/v1/ws/telemetry/${learnerId}`;
 }
+
