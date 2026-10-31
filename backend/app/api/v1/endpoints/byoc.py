@@ -128,8 +128,13 @@ def _filter_boilerplate_regex(text: str) -> str:
     return cleaned.strip()
 
 
-async def _synthesize_with_gemini(raw_text: str, fallback_title: str) -> Optional[dict]:
-    """Uses Google Gemini API to synthesize an in-depth curriculum with native long context."""
+async def _synthesize_with_gemini(
+    raw_text: str,
+    fallback_title: str,
+    comprehension_level: float = 6.5,
+    learning_strategy: str = "DIFFICULTY_FIRST",
+) -> Optional[dict]:
+    """Uses Google Gemini API to synthesize an in-depth curriculum adapted to learner's 1-10 level."""
     settings = get_settings()
     gemini_key = settings.GEMINI_API_KEY.get_secret_value()
     if not gemini_key or len(gemini_key) < 10:
@@ -138,19 +143,49 @@ async def _synthesize_with_gemini(raw_text: str, fallback_title: str) -> Optiona
     model_name = settings.GEMINI_MODEL
     api_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
 
+    # Adaptive Strategy and Difficulty Directives based on user comprehension level
+    if learning_strategy == "TIME_FIRST":
+        pedagogical_calibration = (
+            "LEARNER PROFILE: TIME-BASED RAPID CRASH COURSE (Surface-Level Fast Velocity)\n"
+            "- The learner selected TIME-FIRST mode: prioritize high-yield clarity and speed over exhaustive depth.\n"
+            "- Synthesize concise, punchy summaries (120-180 words per topic) with rapid mental models.\n"
+            "- Include 1 clean, high-yield code snippet and 1 fast multiple choice checkpoint.\n"
+        )
+    elif comprehension_level < 5.0:
+        pedagogical_calibration = (
+            f"LEARNER PROFILE: FOUNDATIONAL / SIMPLIFIED COMPREHENSION (Level {comprehension_level:.1f}/10)\n"
+            f"- The learner has a lower baseline score ({comprehension_level:.1f}/10) or encountered difficulty.\n"
+            "- Explain concepts using everyday physical metaphors (switches, mailboxes, scoreboards, recipes).\n"
+            "- Break down technical mechanisms into 3 simple, non-intimidating steps without jargon overload.\n"
+            "- Include friendly, supportive multiple choice checkpoints to rebuild comprehension confidence.\n"
+        )
+    elif comprehension_level < 7.5:
+        pedagogical_calibration = (
+            f"LEARNER PROFILE: INTERMEDIATE PROFICIENCY (Level {comprehension_level:.1f}/10)\n"
+            f"- The learner has standard competency (Level {comprehension_level:.1f}/10).\n"
+            "- Provide balanced technical depth (250-350 words per topic) with clean architectural trade-offs.\n"
+            "- Include practical production code examples with common pitfalls and standard checkpoints.\n"
+        )
+    else:
+        pedagogical_calibration = (
+            f"LEARNER PROFILE: ADVANCED / SENIOR ENGINEER (Level {comprehension_level:.1f}/10)\n"
+            f"- The learner has high cognitive velocity and comprehension (Level {comprehension_level:.1f}/10).\n"
+            "- DO NOT dumb down concepts. Provide rigorous, deep-dive architectural analysis.\n"
+            "- Explain internal runtime execution, memory allocations, concurrency/event-loop scheduling, and edge cases.\n"
+            "- Provide more challenging, in-depth questions to test true architectural discernment.\n"
+        )
+
     system_instruction = (
         "You are the Principal AI Curriculum Architect for AdaptivEd, an advanced adaptive learning engine.\n"
         "Your task is to transform raw uploaded content (from a PDF, PPT, notes, or web page) into a high-caliber, "
-        "topic-by-topic educational study course.\n\n"
+        "topic-by-topic educational study course tailored to the learner's comprehension profile.\n\n"
+        f"{pedagogical_calibration}\n"
         "STRICT FILTERING & PEDAGOGICAL DIRECTIVES:\n"
         "1. DISCARD ALL BOILERPLATE NOISE: Completely eliminate project title pages, student names, author info, "
         "acknowledgments, tables of contents, disclaimers, and university/organization headers.\n"
         "2. STRUCTURE INTO TOPICS: Synthesize the material into 3 to 6 logical, comprehensive study topics.\n"
-        "3. EXPLAIN DEEPLY: For EACH topic, do not provide a superficial summary. Write an in-depth, thorough explanation "
-        "(at least 250-400 words) that teaches the core mechanisms, includes practical code snippets or technical diagrams "
-        "where appropriate, and clarifies common pitfalls.\n"
-        "4. JUDGE WHAT WAS LEARNT: For EACH topic, provide a Speed-Check multiple choice question to test whether the "
-        "student truly understood the material.\n"
+        "3. EXPLAIN ACCORDING TO PROFILE: Write an explanation calibrated to the learner's profile above.\n"
+        "4. JUDGE WHAT WAS LEARNT: For EACH topic, provide a Speed-Check multiple choice question testing true understanding.\n"
         "5. CODE FORMATTING: Whenever providing code examples, ALWAYS wrap code in standard markdown code fences with a language tag on a separate line (e.g. ```jsx\\n<code here>\\n```). "
         "Format code cleanly across multiple lines with standard indentation, NEVER output code as a single dense line.\n\n"
         "Return STRICTLY a JSON object matching this schema:\n"
@@ -160,7 +195,7 @@ async def _synthesize_with_gemini(raw_text: str, fallback_title: str) -> Optiona
         '  "topics": [\n'
         "    {\n"
         '      "title": "string (Specific Topic Name)",\n'
-        '      "content": "string (In-depth explanation with markdown, code blocks, or diagrams)",\n'
+        '      "content": "string (Calibrated explanation with markdown, code blocks, or diagrams)",\n'
         '      "speed_check": {\n'
         '        "question": "string (Conceptual question)",\n'
         '        "options": ["Option A", "Option B", "Option C", "Option D"],\n'
@@ -207,15 +242,25 @@ async def _synthesize_with_gemini(raw_text: str, fallback_title: str) -> Optiona
     return None
 
 
-async def synthesize_curriculum_with_ai(raw_text: str, fallback_title: str) -> dict:
+async def synthesize_curriculum_with_ai(
+    raw_text: str,
+    fallback_title: str,
+    comprehension_level: float = 6.5,
+    learning_strategy: str = "DIFFICULTY_FIRST",
+) -> dict:
     """
     Tiered AI Curriculum Synthesis:
-    Tier 1: Google Gemini (Massive context, native document understanding, zero schema errors).
+    Tier 1: Google Gemini (Calibrated to learner comprehension level 1.0 - 10.0 and strategy).
     Tier 2: Groq LPU (GPT-OSS / LLaMA-3.3-70B high-throughput inference).
     Tier 3: Heuristic Rule-Based Clean Splitter.
     """
     # 1. Attempt Primary: Google Gemini
-    gemini_result = await _synthesize_with_gemini(raw_text, fallback_title)
+    gemini_result = await _synthesize_with_gemini(
+        raw_text=raw_text,
+        fallback_title=fallback_title,
+        comprehension_level=comprehension_level,
+        learning_strategy=learning_strategy,
+    )
     if gemini_result:
         return gemini_result
 
@@ -348,6 +393,8 @@ async def ingest_and_synthesize_content(
     raw_text_input: Optional[str] = Form(default=None, description="Direct text notes or lecture slides pasted by user."),
     title: Optional[str] = Form(default=None, description="Optional custom title for the course."),
     wpm_baseline: float = Form(default=220.0, ge=80.0, le=600.0),
+    comprehension_level: float = Form(default=6.5, ge=1.0, le=10.0, description="Learner 1.0 - 10.0 understanding level"),
+    learning_strategy: str = Form(default="DIFFICULTY_FIRST", description="'DIFFICULTY_FIRST' or 'TIME_FIRST'"),
 ) -> ResponseEnvelope[BYOCIngestionResult]:
     """
     Intelligent BYOC Ingestion Pipeline:
@@ -402,8 +449,13 @@ async def ingest_and_synthesize_content(
 
     resolved_title = title.strip() if title and title.strip() else "Intelligent Adaptive Track"
 
-    # AI Curriculum Synthesis: Discard boilerplate + generate topic-wise course
-    curriculum_data = await synthesize_curriculum_with_ai(raw_text, resolved_title)
+    # AI Curriculum Synthesis: Discard boilerplate + generate topic-wise course adapted to level & strategy
+    curriculum_data = await synthesize_curriculum_with_ai(
+        raw_text=raw_text,
+        fallback_title=resolved_title,
+        comprehension_level=comprehension_level,
+        learning_strategy=learning_strategy,
+    )
     course_title = curriculum_data.get("title") or resolved_title
     course_desc = curriculum_data.get("description") or f"Curated from {source_name}"
     synthesized_topics = curriculum_data.get("topics", [])

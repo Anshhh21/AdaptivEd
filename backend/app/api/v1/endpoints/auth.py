@@ -2,7 +2,7 @@ import hashlib
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -51,12 +51,22 @@ class GoogleAuthRequest(BaseModel):
     photo_url: Optional[str] = None
 
 
+class StrategyUpdateRequest(BaseModel):
+    user_id: str
+    learning_strategy: str = Field(default="DIFFICULTY_FIRST", description="'DIFFICULTY_FIRST' or 'TIME_FIRST'")
+
+
 class ProgressUpdateRequest(BaseModel):
     user_id: str
     lesson_id: str
     track_id: str
+    topic_title: Optional[str] = None
     xp_earned: int = Field(default=50, ge=0)
     bcs_score: float = Field(default=0.85, ge=0.0, le=1.0)
+    quiz_passed: bool = Field(default=True, description="Whether checkpoint was passed")
+    dwell_time_seconds: float = Field(default=25.0, ge=0.0)
+    struggle_signals: int = Field(default=0, ge=0, description="Mistakes or friction events")
+    learning_strategy: Optional[str] = None
 
 
 class AuthResponseData(BaseModel):
@@ -70,6 +80,44 @@ class AuthResponseData(BaseModel):
     access_token: str
     auth_provider: str = "email"
     token_type: str = "bearer"
+    comprehension_score: float = Field(default=6.5, ge=1.0, le=10.0)
+    learning_strategy: str = Field(default="DIFFICULTY_FIRST")
+    total_topics_learned: int = Field(default=0, ge=0)
+    comprehension_history: List[dict] = Field(default_factory=list)
+
+
+def calculate_comprehension_delta(
+    current_score: float,
+    quiz_passed: bool,
+    struggle_signals: int,
+    dwell_time_seconds: float,
+    learning_strategy: str,
+) -> tuple[float, str]:
+    """
+    Computes real-time Comprehension Rating delta on 1.0 - 10.0 scale.
+    - If user struggles (errors/high friction), level adjusts down (-0.2 to -0.4) so subsequent content adapts simpler.
+    - If user demonstrates strong accuracy and healthy dwell time, level increases (+0.2 to +0.5).
+    - In TIME_FIRST mode, rewards fast accurate throughput.
+    """
+    if quiz_passed and struggle_signals == 0:
+        if learning_strategy == "TIME_FIRST" and dwell_time_seconds < 25:
+            delta = 0.4
+            feedback = "Rapid high-yield mastery verified! (+0.4 Level Up)"
+        elif dwell_time_seconds >= 20:
+            delta = 0.3
+            feedback = "Flawless concept comprehension verified! (+0.3 Level Up)"
+        else:
+            delta = 0.2
+            feedback = "Checkpoint passed. (+0.2 Level Up)"
+    elif quiz_passed and struggle_signals > 0:
+        delta = 0.1
+        feedback = "Concept verified after reviewing assistance. (+0.1 Level Up)"
+    else:
+        delta = -0.3
+        feedback = "Concept friction detected. Calibrating subsequent content to simpler analogies (-0.3)."
+
+    new_score = round(max(1.0, min(10.0, current_score + delta)), 1)
+    return new_score, feedback
 
 
 def _generate_user_id(email: str) -> str:
@@ -121,6 +169,10 @@ async def register(payload: RegisterRequest) -> ResponseEnvelope[AuthResponseDat
             "current_streak_days": new_profile.current_streak_days,
             "wpm_baseline": new_profile.baseline.wpm,
             "effective_learning_velocity": new_profile.effective_learning_velocity,
+            "comprehension_score": getattr(new_profile, "comprehension_score", 6.5) or 6.5,
+            "learning_strategy": getattr(new_profile, "learning_strategy", "DIFFICULTY_FIRST") or "DIFFICULTY_FIRST",
+            "total_topics_learned": getattr(new_profile, "total_topics_learned", 0) or 0,
+            "comprehension_history": getattr(new_profile, "comprehension_history", []) or [],
         }
     except HTTPException:
         raise
@@ -186,6 +238,10 @@ async def login(payload: LoginRequest) -> ResponseEnvelope[AuthResponseData]:
                 "current_streak_days": profile.current_streak_days,
                 "wpm_baseline": profile.baseline.wpm,
                 "effective_learning_velocity": profile.effective_learning_velocity,
+                "comprehension_score": getattr(profile, "comprehension_score", 6.5) or 6.5,
+                "learning_strategy": getattr(profile, "learning_strategy", "DIFFICULTY_FIRST") or "DIFFICULTY_FIRST",
+                "total_topics_learned": getattr(profile, "total_topics_learned", 0) or 0,
+                "comprehension_history": getattr(profile, "comprehension_history", []) or [],
             }
         else:
             raise HTTPException(
@@ -269,6 +325,10 @@ async def authenticate_with_google(payload: GoogleAuthRequest) -> ResponseEnvelo
             "current_streak_days": profile.current_streak_days,
             "wpm_baseline": profile.baseline.wpm,
             "effective_learning_velocity": profile.effective_learning_velocity,
+            "comprehension_score": getattr(profile, "comprehension_score", 6.5) or 6.5,
+            "learning_strategy": getattr(profile, "learning_strategy", "DIFFICULTY_FIRST") or "DIFFICULTY_FIRST",
+            "total_topics_learned": getattr(profile, "total_topics_learned", 0) or 0,
+            "comprehension_history": getattr(profile, "comprehension_history", []) or [],
         }
     except Exception as db_exc:
         logger.warning(f"MongoDB offline ({db_exc}). In-memory Google authentication.")
@@ -306,12 +366,45 @@ async def authenticate_with_google(payload: GoogleAuthRequest) -> ResponseEnvelo
 @router.post("/auth/progress", response_model=ResponseEnvelope[dict], tags=["Auth"])
 async def update_learning_progress(payload: ProgressUpdateRequest) -> ResponseEnvelope[dict]:
     """
-    Persists lesson completion, earned XP, and streaks directly to MongoDB Atlas.
+    Persists lesson completion, earned XP, streaks, and updates the learner's 1.0 - 10.0
+    comprehension level directly in MongoDB Atlas.
     """
     try:
         profile = await LearnerProfile.find_one(LearnerProfile.user_id == payload.user_id)
         if profile:
             profile.total_xp += payload.xp_earned
+
+            # Calculate updated 1.0 - 10.0 comprehension score
+            old_score = getattr(profile, "comprehension_score", 6.5) or 6.5
+            active_strategy = payload.learning_strategy or getattr(profile, "learning_strategy", "DIFFICULTY_FIRST") or "DIFFICULTY_FIRST"
+            new_score, feedback = calculate_comprehension_delta(
+                current_score=old_score,
+                quiz_passed=payload.quiz_passed,
+                struggle_signals=payload.struggle_signals,
+                dwell_time_seconds=payload.dwell_time_seconds,
+                learning_strategy=active_strategy,
+            )
+            profile.comprehension_score = new_score
+            profile.total_topics_learned = getattr(profile, "total_topics_learned", 0) + 1
+            if payload.learning_strategy:
+                profile.learning_strategy = payload.learning_strategy
+
+            # Append to comprehension audit log in MongoDB
+            audit_entry = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "topic_title": payload.topic_title or payload.lesson_id,
+                "previous_score": old_score,
+                "new_score": new_score,
+                "delta": round(new_score - old_score, 1),
+                "quiz_passed": payload.quiz_passed,
+                "dwell_time_seconds": round(payload.dwell_time_seconds, 1),
+                "feedback": feedback,
+            }
+            if not hasattr(profile, "comprehension_history") or profile.comprehension_history is None:
+                profile.comprehension_history = []
+            profile.comprehension_history.insert(0, audit_entry)
+            profile.comprehension_history = profile.comprehension_history[:50]
+
             if payload.track_id not in profile.tracks:
                 profile.tracks[payload.track_id] = TrackProgress(
                     track_id=payload.track_id,
@@ -326,16 +419,25 @@ async def update_learning_progress(payload: ProgressUpdateRequest) -> ResponseEn
 
             profile.updated_at = datetime.now(timezone.utc)
             await profile.save()
-            logger.info(f"Saved progress for {payload.user_id} in MongoDB Atlas: +{payload.xp_earned} XP")
+            logger.info(
+                f"Saved progress for {payload.user_id} in MongoDB Atlas: +{payload.xp_earned} XP, "
+                f"Comprehension {old_score} -> {new_score}"
+            )
 
             return ResponseEnvelope(
                 success=True,
                 data={
                     "total_xp": profile.total_xp,
                     "current_streak_days": profile.current_streak_days,
+                    "comprehension_score": profile.comprehension_score,
+                    "previous_score": old_score,
+                    "score_delta": round(new_score - old_score, 1),
+                    "feedback": feedback,
+                    "learning_strategy": profile.learning_strategy,
+                    "total_topics_learned": profile.total_topics_learned,
                     "track_progress": profile.tracks[payload.track_id].model_dump(),
                 },
-                message="Progress persisted to MongoDB Atlas.",
+                message=f"Comprehension updated to {profile.comprehension_score}/10: {feedback}",
             )
     except Exception as exc:
         logger.warning(f"Failed to persist progress to MongoDB Atlas: {exc}")
@@ -344,16 +446,50 @@ async def update_learning_progress(payload: ProgressUpdateRequest) -> ResponseEn
     for p in _IN_MEMORY_PROFILES.values():
         if p["user_id"] == payload.user_id:
             p["total_xp"] = p.get("total_xp", 0) + payload.xp_earned
+            p["comprehension_score"] = round(p.get("comprehension_score", 6.5) + (0.3 if payload.quiz_passed else -0.3), 1)
             return ResponseEnvelope(
                 success=True,
-                data={"total_xp": p["total_xp"]},
+                data={
+                    "total_xp": p["total_xp"],
+                    "comprehension_score": p["comprehension_score"],
+                    "score_delta": 0.3 if payload.quiz_passed else -0.3,
+                },
                 message="Progress updated in memory store.",
             )
 
     return ResponseEnvelope(
         success=True,
-        data={"total_xp": 100},
+        data={"total_xp": 100, "comprehension_score": 6.8, "score_delta": 0.3},
         message="Progress recorded.",
+    )
+
+
+@router.post("/auth/strategy", response_model=ResponseEnvelope[dict], tags=["Auth"])
+async def set_learning_strategy(payload: StrategyUpdateRequest) -> ResponseEnvelope[dict]:
+    """
+    Updates the learner's active mode ('DIFFICULTY_FIRST' or 'TIME_FIRST') in MongoDB.
+    """
+    try:
+        profile = await LearnerProfile.find_one(LearnerProfile.user_id == payload.user_id)
+        if profile:
+            profile.learning_strategy = payload.learning_strategy
+            profile.updated_at = datetime.now(timezone.utc)
+            await profile.save()
+            return ResponseEnvelope(
+                success=True,
+                data={
+                    "learning_strategy": profile.learning_strategy,
+                    "comprehension_score": getattr(profile, "comprehension_score", 6.5) or 6.5,
+                },
+                message=f"Strategy switched to {payload.learning_strategy} and saved to MongoDB.",
+            )
+    except Exception as exc:
+        logger.warning(f"Failed to update learning strategy: {exc}")
+
+    return ResponseEnvelope(
+        success=True,
+        data={"learning_strategy": payload.learning_strategy, "comprehension_score": 6.5},
+        message=f"Strategy switched to {payload.learning_strategy}.",
     )
 
 
@@ -374,6 +510,10 @@ async def get_user_profile(user_id: str) -> ResponseEnvelope[AuthResponseData]:
                     wpm_baseline=profile.baseline.wpm,
                     effective_learning_velocity=profile.effective_learning_velocity,
                     access_token="active_session",
+                    comprehension_score=getattr(profile, "comprehension_score", 6.5) or 6.5,
+                    learning_strategy=getattr(profile, "learning_strategy", "DIFFICULTY_FIRST") or "DIFFICULTY_FIRST",
+                    total_topics_learned=getattr(profile, "total_topics_learned", 0) or 0,
+                    comprehension_history=getattr(profile, "comprehension_history", []) or [],
                 ),
                 message="Profile retrieved from MongoDB Atlas.",
             )

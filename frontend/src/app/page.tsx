@@ -115,6 +115,9 @@ export default function Home() {
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
                 <span className="font-semibold text-white">{userSession.display_name}</span>
+                <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono text-[11px] font-bold">
+                  🎯 {(userSession.comprehension_score || 6.5).toFixed(1)}/10
+                </span>
                 <span className="text-amber-400 font-mono text-[11px]">🔥 {userSession.current_streak_days}d</span>
                 <span className="text-indigo-400 font-mono text-[11px]">+{userSession.total_xp} XP</span>
               </button>
@@ -146,6 +149,8 @@ export default function Home() {
           <AIStudyHub
             onSelectTopic={handleSelectTopic}
             onOpenArena={() => setCurrentView("arena")}
+            userSession={userSession}
+            onUpdateSession={setUserSession}
           />
         )}
 
@@ -169,6 +174,11 @@ export default function Home() {
                 chunks={selectedTopic.chunks}
                 learnerId={userSession?.user_id || "learner_anonymous"}
                 onLessonComplete={handleLessonComplete}
+                onScoreUpdated={(newScore) => {
+                  if (userSession) {
+                    setUserSession((prev) => (prev ? { ...prev, comprehension_score: newScore } : null));
+                  }
+                }}
               />
             ) : (
               <div className="max-w-md mx-auto py-20 text-center space-y-4">

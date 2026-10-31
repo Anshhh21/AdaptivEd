@@ -53,7 +53,7 @@ class LearnerProfile(Document):
     # Cognitive & Behavioral Calibration
     baseline: CognitiveBaseline = Field(default_factory=CognitiveBaseline)
 
-    # Gamification & Velocity
+    # Gamification, Velocity & Comprehension Level
     total_xp: int = Field(default=0, ge=0)
     current_streak_days: int = Field(default=0, ge=0)
     longest_streak_days: int = Field(default=0, ge=0)
@@ -63,6 +63,23 @@ class LearnerProfile(Document):
     )
     percentile_rank: float = Field(
         default=50.0, ge=0.0, le=100.0, description="Cognitive Velocity League percentile rank."
+    )
+
+    # 1.0 - 10.0 Comprehension Rating & Adaptive Strategy
+    comprehension_score: float = Field(
+        default=6.5,
+        ge=1.0,
+        le=10.0,
+        description="Dynamic cognitive comprehension score on 1.0 to 10.0 scale updated after each learning session.",
+    )
+    learning_strategy: str = Field(
+        default="DIFFICULTY_FIRST",
+        description="'DIFFICULTY_FIRST' (deep conceptual mastery) or 'TIME_FIRST' (rapid high-yield crash course).",
+    )
+    total_topics_learned: int = Field(default=0, ge=0)
+    comprehension_history: List[dict] = Field(
+        default_factory=list,
+        description="Audit log of score deltas, dwell times, and accuracy per learned topic.",
     )
 
     # Learning Track Progressions

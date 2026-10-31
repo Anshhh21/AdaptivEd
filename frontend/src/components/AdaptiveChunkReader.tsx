@@ -41,6 +41,7 @@ interface AdaptiveChunkReaderProps {
   chunks: SemanticChunkData[];
   learnerId?: string;
   onLessonComplete?: () => void;
+  onScoreUpdated?: (newScore: number, delta: number, feedback: string) => void;
 }
 
 export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
@@ -49,10 +50,18 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
   chunks,
   learnerId = "learner_anonymous",
   onLessonComplete,
+  onScoreUpdated,
 }) => {
   const [activeChunkIndex, setActiveChunkIndex] = useState<number>(0);
   const [activeViewMode, setActiveViewMode] = useState<"ORIGINAL" | "ADAPTED">("ORIGINAL");
   const [isAdaptiveAssistanceActive, setIsAdaptiveAssistanceActive] = useState<boolean>(false);
+  const [comprehensionToast, setComprehensionToast] = useState<{
+    previousScore: number;
+    newScore: number;
+    delta: number;
+    feedback: string;
+  } | null>(null);
+  const chunkStartTimeRef = useRef<number>(Date.now());
   const [dynamicAdaptations, setDynamicAdaptations] = useState<
     Record<
       number,
@@ -200,6 +209,8 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
     if (selected === undefined || selected === null || !speedCheck) return;
 
     const isCorrect = selected === speedCheck.correct_option_index;
+    const dwellSeconds = Math.max(5, (Date.now() - chunkStartTimeRef.current) / 1000);
+
     setInlineVerified((prev) => ({ ...prev, [activeChunkIndex]: true }));
     setInlineFeedback((prev) => ({
       ...prev,
@@ -210,6 +221,57 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
           : `✗ Review needed. Correct answer is Option ${speedCheck.correct_option_index + 1}: "${speedCheck.options[speedCheck.correct_option_index]}". ${speedCheck.explanation}`,
       },
     }));
+
+    // Persist dynamic 1.0 - 10.0 comprehension score directly to MongoDB Atlas
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/v1/auth/progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: learnerId,
+          lesson_id: currentChunk?.id || `chunk-${activeChunkIndex}`,
+          track_id: lessonId,
+          topic_title: currentChunk?.title || lessonTitle,
+          xp_earned: isCorrect ? 50 : 10,
+          bcs_score: isCorrect ? 0.95 : 0.45,
+          quiz_passed: isCorrect,
+          dwell_time_seconds: dwellSeconds,
+          struggle_signals: isCorrect ? 0 : 1,
+        }),
+      });
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        const { comprehension_score, previous_score, score_delta, feedback } = json.data;
+        if (comprehension_score !== undefined) {
+          const deltaVal = score_delta ?? (isCorrect ? 0.3 : -0.3);
+          setComprehensionToast({
+            previousScore: previous_score ?? 6.5,
+            newScore: comprehension_score,
+            delta: deltaVal,
+            feedback: feedback ?? (isCorrect ? "+0.3 Level Up" : "Calibrating simpler analogies (-0.3)"),
+          });
+
+          // Sync local storage session
+          try {
+            const stored = localStorage.getItem("adaptived_user");
+            if (stored) {
+              const u = JSON.parse(stored);
+              u.comprehension_score = comprehension_score;
+              localStorage.setItem("adaptived_user", JSON.stringify(u));
+            }
+          } catch {
+            // Ignored
+          }
+
+          if (onScoreUpdated) {
+            onScoreUpdated(comprehension_score, deltaVal, feedback);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to persist real-time comprehension update to MongoDB:", err);
+    }
 
     // If incorrect, flag adaptive assistance and fetch Gemini analogy in background without forcing a disruptive view switch
     if (!isCorrect) {
@@ -248,6 +310,8 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
   const handleNextChunk = () => {
     if (activeChunkIndex < chunks.length - 1) {
       setActiveChunkIndex((prev) => prev + 1);
+      chunkStartTimeRef.current = Date.now();
+      setComprehensionToast(null);
       // Preserve the user's manual view mode preference without forcing tab flips
       setIsSpeedCheckPassed(false);
       setSelectedOption(null);
@@ -260,6 +324,8 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
   const handlePrevChunk = () => {
     if (activeChunkIndex > 0) {
       setActiveChunkIndex((prev) => prev - 1);
+      chunkStartTimeRef.current = Date.now();
+      setComprehensionToast(null);
       setIsSpeedCheckPassed(false);
     }
   };
@@ -529,6 +595,33 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
                   }`}
                 >
                   {inlineFeedback[activeChunkIndex].text}
+                </div>
+              )}
+
+              {/* Dynamic 1.0 - 10.0 Comprehension Score Update Card (Synced to MongoDB Atlas) */}
+              {comprehensionToast && (
+                <div
+                  className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs animate-fadeIn ${
+                    comprehensionToast.delta >= 0
+                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                      : "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-bold text-sm">
+                      🎯 Level {comprehensionToast.previousScore.toFixed(1)} → {comprehensionToast.newScore.toFixed(1)}
+                    </span>
+                    <span className="font-semibold px-2 py-0.5 rounded bg-black/40 font-mono text-[11px]">
+                      {comprehensionToast.delta >= 0
+                        ? `+${comprehensionToast.delta.toFixed(1)} Level Up`
+                        : `${comprehensionToast.delta.toFixed(1)} Friction`}
+                    </span>
+                    <span className="text-slate-300 hidden md:inline">• {comprehensionToast.feedback}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 font-mono text-[10px] text-slate-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Saved to MongoDB Atlas</span>
+                  </div>
                 </div>
               )}
 

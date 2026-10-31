@@ -3,14 +3,26 @@
 import React, { useState, useEffect } from "react";
 import { TopicModule } from "../types/curriculum";
 import { SemanticChunkData } from "./AdaptiveChunkReader";
+import { UserSession } from "./AuthModal";
 
 interface AIStudyHubProps {
   onSelectTopic: (topic: TopicModule, techName: string) => void;
   onOpenArena: () => void;
+  userSession?: UserSession | null;
+  onUpdateSession?: (session: UserSession) => void;
 }
 
-export const AIStudyHub: React.FC<AIStudyHubProps> = ({ onSelectTopic, onOpenArena }) => {
+export const AIStudyHub: React.FC<AIStudyHubProps> = ({
+  onSelectTopic,
+  onOpenArena,
+  userSession,
+  onUpdateSession,
+}) => {
   const [activeTab, setActiveTab] = useState<"url" | "document" | "notes">("url");
+  const [strategy, setStrategy] = useState<"DIFFICULTY_FIRST" | "TIME_FIRST">(
+    userSession?.learning_strategy || "DIFFICULTY_FIRST"
+  );
+  const [showHistoryDrawer, setShowHistoryDrawer] = useState<boolean>(false);
   const [urlInput, setUrlInput] = useState<string>("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [notesInput, setNotesInput] = useState<string>("");
@@ -19,6 +31,29 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({ onSelectTopic, onOpenAre
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadingStep, setLoadingStep] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const currentScore = userSession?.comprehension_score || 6.5;
+
+  const handleToggleStrategy = async (newStrategy: "DIFFICULTY_FIRST" | "TIME_FIRST") => {
+    setStrategy(newStrategy);
+    if (userSession && onUpdateSession) {
+      const updated: UserSession = { ...userSession, learning_strategy: newStrategy };
+      onUpdateSession(updated);
+      try {
+        localStorage.setItem("adaptived_user", JSON.stringify(updated));
+        await fetch("http://127.0.0.1:8000/api/v1/auth/strategy", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: userSession.user_id,
+            learning_strategy: newStrategy,
+          }),
+        });
+      } catch (err) {
+        console.warn("Failed to persist learning strategy to MongoDB:", err);
+      }
+    }
+  };
 
   // Ingested Courses History
   const [savedCourses, setSavedCourses] = useState<
@@ -77,6 +112,9 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({ onSelectTopic, onOpenAre
 
     try {
       const formData = new FormData();
+      formData.append("comprehension_level", String(currentScore));
+      formData.append("learning_strategy", strategy);
+
       if (customTitle.trim()) {
         formData.append("title", customTitle.trim());
       }
@@ -182,6 +220,95 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({ onSelectTopic, onOpenAre
 
       {/* 2. Main Ingestion Workstation */}
       <div className="relative rounded-3xl bg-slate-900/90 border border-slate-800 p-6 sm:p-8 shadow-2xl space-y-6">
+        {/* Adaptive Comprehension Profile & Strategy Controller */}
+        <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800/90 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Left: Dynamic 1.0 - 10.0 Comprehension Meter */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Cognitive Comprehension Rating
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="text-[10px] font-mono text-emerald-400">MongoDB Synced</span>
+            </div>
+
+            <div className="flex items-baseline gap-3">
+              <span className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
+                {currentScore.toFixed(1)}
+                <span className="text-slate-500 text-sm font-sans font-normal"> / 10.0</span>
+              </span>
+
+              <span
+                className={`text-xs px-2.5 py-0.5 rounded-full border font-semibold ${
+                  currentScore < 5.0
+                    ? "bg-rose-500/10 border-rose-500/30 text-rose-300"
+                    : currentScore < 7.5
+                    ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-300"
+                    : "bg-amber-500/10 border-amber-500/30 text-amber-300"
+                }`}
+              >
+                {currentScore < 5.0
+                  ? "Foundational (Adapting simpler analogies)"
+                  : currentScore < 7.5
+                  ? "Proficient (Standard architectural depth)"
+                  : "Advanced / Senior (Deep mechanics & edge cases)"}
+              </span>
+            </div>
+
+            <div className="w-48 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-500 ${
+                  currentScore < 5.0 ? "bg-rose-500" : currentScore < 7.5 ? "bg-indigo-500" : "bg-amber-400"
+                }`}
+                style={{ width: `${Math.min(100, (currentScore / 10) * 100)}%` }}
+              ></div>
+            </div>
+          </div>
+
+          {/* Right: Strategy Mode Selector (Difficulty-Based vs Time-Based) */}
+          <div className="space-y-2">
+            <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Learning Focus Strategy
+            </div>
+
+            <div className="inline-flex bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => handleToggleStrategy("DIFFICULTY_FIRST")}
+                className={`px-3.5 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                  strategy === "DIFFICULTY_FIRST"
+                    ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                    : "text-slate-400 hover:text-white"
+                }`}
+                title="Calibrates content depth and question rigor to your exact comprehension score"
+              >
+                <span>🎯</span>
+                <span>Difficulty-Based (Deep Mastery)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleToggleStrategy("TIME_FIRST")}
+                className={`px-3.5 py-2 rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
+                  strategy === "TIME_FIRST"
+                    ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
+                    : "text-slate-400 hover:text-white"
+                }`}
+                title="Condenses into fast, surface-level high-yield takeaways for rapid reading"
+              >
+                <span>⚡</span>
+                <span>Time-Based (Rapid Speed)</span>
+              </button>
+            </div>
+
+            <p className="text-[11px] text-slate-400 max-w-sm">
+              {strategy === "DIFFICULTY_FIRST"
+                ? `Prioritizes conceptual depth tuned to your Level ${currentScore.toFixed(1)} score in MongoDB.`
+                : "Prioritizes velocity: generates concise high-yield crash summaries for quick review."}
+            </p>
+          </div>
+        </div>
+
         {/* Source Tabs */}
         <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800/80 text-xs font-semibold">
           <button

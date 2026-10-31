@@ -12,6 +12,19 @@ export interface UserSession {
   effective_learning_velocity: number;
   auth_provider?: string;
   access_token?: string;
+  comprehension_score?: number; // 1.0 to 10.0 scale (e.g. 7.2)
+  learning_strategy?: "DIFFICULTY_FIRST" | "TIME_FIRST";
+  total_topics_learned?: number;
+  comprehension_history?: Array<{
+    timestamp: string;
+    topic_title: string;
+    previous_score: number;
+    new_score: number;
+    delta: number;
+    quiz_passed: boolean;
+    dwell_time_seconds: number;
+    feedback: string;
+  }>;
 }
 
 interface AuthModalProps {
