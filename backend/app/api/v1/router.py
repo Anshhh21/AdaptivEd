@@ -1,7 +1,11 @@
 from fastapi import APIRouter
+from app.api.v1.endpoints.telemetry import router as telemetry_router
 from app.schemas.base import ResponseEnvelope
 
 api_v1_router = APIRouter()
+
+# Mount Telemetry Streaming & Scoring Subsystem
+api_v1_router.include_router(telemetry_router, prefix="", tags=["Telemetry"])
 
 
 @api_v1_router.get("/status", response_model=ResponseEnvelope[dict], tags=["System"])
