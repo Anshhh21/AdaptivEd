@@ -209,6 +209,10 @@ async def register(payload: RegisterRequest) -> ResponseEnvelope[AuthResponseDat
             effective_learning_velocity=profile_data["effective_learning_velocity"],
             access_token=token_payload,
             auth_provider="email",
+            comprehension_score=profile_data.get("comprehension_score", 6.5) or 6.5,
+            learning_strategy=profile_data.get("learning_strategy", "DIFFICULTY_FIRST") or "DIFFICULTY_FIRST",
+            total_topics_learned=profile_data.get("total_topics_learned", 0) or 0,
+            comprehension_history=profile_data.get("comprehension_history", []) or [],
         ),
         message=f"Welcome to AdaptivEd, {display_name}!",
     )
@@ -280,6 +284,10 @@ async def login(payload: LoginRequest) -> ResponseEnvelope[AuthResponseData]:
             effective_learning_velocity=profile_data["effective_learning_velocity"],
             access_token=token_payload,
             auth_provider="email",
+            comprehension_score=profile_data.get("comprehension_score", 6.5) or 6.5,
+            learning_strategy=profile_data.get("learning_strategy", "DIFFICULTY_FIRST") or "DIFFICULTY_FIRST",
+            total_topics_learned=profile_data.get("total_topics_learned", 0) or 0,
+            comprehension_history=profile_data.get("comprehension_history", []) or [],
         ),
         message=f"Welcome back, {profile_data['display_name']}!",
     )
@@ -358,6 +366,10 @@ async def authenticate_with_google(payload: GoogleAuthRequest) -> ResponseEnvelo
             effective_learning_velocity=profile_data["effective_learning_velocity"],
             access_token=token_payload,
             auth_provider="google",
+            comprehension_score=profile_data.get("comprehension_score", 6.5) or 6.5,
+            learning_strategy=profile_data.get("learning_strategy", "DIFFICULTY_FIRST") or "DIFFICULTY_FIRST",
+            total_topics_learned=profile_data.get("total_topics_learned", 0) or 0,
+            comprehension_history=profile_data.get("comprehension_history", []) or [],
         ),
         message=f"Signed in with Google as {display_name}!",
     )

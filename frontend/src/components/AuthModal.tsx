@@ -44,6 +44,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [email, setEmail] = useState<string>("");
   const [displayName, setDisplayName] = useState<string>("");
   const [password, setPassword] = useState<string>("");
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -118,9 +119,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       return;
     }
 
-    if (mode === "signup" && !displayName.trim()) {
-      setErrorMsg("Please enter your full name.");
-      return;
+    if (mode === "signup") {
+      if (!displayName.trim()) {
+        setErrorMsg("Please enter your full name.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setErrorMsg("Passwords do not match. Please re-enter.");
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -268,7 +275,22 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </button>
             </div>
 
-            {/* Custom Google Account Input */}
+            {/* Third-Party Google Redirect Option */}
+            <div className="pt-2 space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  window.open("https://accounts.google.com/signin/v2/identifier", "_blank", "width=520,height=640");
+                }}
+                className="w-full py-2.5 px-4 rounded-xl border border-slate-700 hover:border-slate-600 bg-slate-900/90 hover:bg-slate-800 text-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer shadow-sm"
+              >
+                <span>🌐</span>
+                <span>Open Google Sign-In Window (accounts.google.com) ↗</span>
+              </button>
+              <p className="text-[10px] text-center text-slate-400">
+                Opens Google&apos;s third-party authentication portal.
+              </p>
+            </div>
             {showCustomGoogleInput && (
               <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 animate-fadeIn">
                 <input
@@ -453,6 +475,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </span>
                 )}
               </div>
+
+              {/* Confirm Password field on Sign Up */}
+              {mode === "signup" && (
+                <div>
+                  <label
+                    htmlFor="auth-confirm-password-input"
+                    className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5"
+                  >
+                    Confirm Password
+                  </label>
+                  <input
+                    id="auth-confirm-password-input"
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition font-mono"
+                  />
+                </div>
+              )}
 
               {errorMsg && (
                 <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs leading-relaxed">
