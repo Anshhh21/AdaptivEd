@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+from app.api.v1.endpoints.byoc import router as byoc_router
 from app.api.v1.endpoints.lessons import router as lessons_router
 from app.api.v1.endpoints.telemetry import router as telemetry_router
 from app.schemas.base import ResponseEnvelope
@@ -10,6 +11,9 @@ api_v1_router.include_router(telemetry_router, prefix="", tags=["Telemetry"])
 
 # Mount Curriculum & Lessons Subsystem
 api_v1_router.include_router(lessons_router, prefix="", tags=["Lessons"])
+
+# Mount Bring Your Own Content (BYOC) Ingestion Subsystem
+api_v1_router.include_router(byoc_router, prefix="", tags=["BYOC"])
 
 
 @api_v1_router.get("/status", response_model=ResponseEnvelope[dict], tags=["System"])
