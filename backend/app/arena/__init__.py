@@ -1,3 +1,4 @@
+from app.arena.deployment_audit import DeploymentAuditService
 from app.arena.github_audit import GitHubAuditService
 from app.arena.schemas import (
     ArchitecturalVivaQuestion,
@@ -11,9 +12,12 @@ from app.arena.schemas import (
     VivaEvaluation,
     VivaSubmission,
 )
+from app.arena.viva import VivaEngine
 
 __all__ = [
     "GitHubAuditService",
+    "DeploymentAuditService",
+    "VivaEngine",
     "SecurityFinding",
     "CodeQualityMetric",
     "RepoAuditReport",
@@ -25,4 +29,3 @@ __all__ = [
     "ChaosVerificationResult",
     "ArenaSubmissionReport",
 ]
-
