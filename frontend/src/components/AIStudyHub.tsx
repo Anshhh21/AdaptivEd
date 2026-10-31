@@ -58,7 +58,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
     }
   };
 
-  // Saved Courses History
+  // Past Ingested Courses
   const [savedCourses, setSavedCourses] = useState<
     Array<{
       id: string;
@@ -77,7 +77,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
         setSavedCourses(JSON.parse(stored));
       }
     } catch {
-      // Ignored
+      // Browser storage fallback
     }
   }, []);
 
@@ -96,7 +96,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
     setErrorMsg(null);
 
     if (activeTab === "url" && !urlInput.trim().startsWith("http")) {
-      setErrorMsg("Please enter a valid website link (e.g. https://www.w3schools.com/js/).");
+      setErrorMsg("Please enter a valid website link (e.g. https://example.com/guide).");
       return;
     }
 
@@ -106,18 +106,18 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
     }
 
     if (activeTab === "notes" && !notesInput.trim()) {
-      setErrorMsg("Please paste some notes or specify a topic to learn.");
+      setErrorMsg("Please paste some notes or specify a concept to learn.");
       return;
     }
 
     setIsLoading(true);
-    setLoadingStep("Reading and extracting relevant topics...");
+    setLoadingStep("Reading and analyzing content...");
 
     try {
       let response: Response;
 
       if (activeTab === "url") {
-        setLoadingStep("Accessing page content and discarding fluff...");
+        setLoadingStep("Accessing page and filtering boilerplate...");
         response = await fetch("http://127.0.0.1:8000/api/v1/byoc/ingest-url", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -159,7 +159,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
         throw new Error(errData.detail || "Failed to generate course from input.");
       }
 
-      setLoadingStep("Formatting topic breakdown and interactive quizzes...");
+      setLoadingStep("Formatting topic modules and understanding checkpoints...");
       const result = await response.json();
 
       const newTopic: TopicModule = {
@@ -181,7 +181,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
             target_dwell_ms: (c.read_time_seconds || 180) * 1000,
             speed_check: checkpoint
               ? {
-                  question: checkpoint.prompt || checkpoint.question || "Quick understanding check:",
+                  question: checkpoint.prompt || checkpoint.question || "Quick concept check:",
                   options: checkpoint.options || ["Yes", "No"],
                   correct_option_index: checkpoint.correct_option_index ?? 0,
                   explanation: checkpoint.explanation || "Concept verification checkpoint.",
@@ -200,7 +200,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
         topic: newTopic,
       };
 
-      const updatedSaved = [savedEntry, ...savedCourses.filter((c) => c.title !== newTopic.title)].slice(0, 8);
+      const updatedSaved = [savedEntry, ...savedCourses.filter((c) => c.title !== newTopic.title)].slice(0, 10);
       setSavedCourses(updatedSaved);
       try {
         localStorage.setItem("adaptived_saved_courses", JSON.stringify(updatedSaved));
@@ -220,7 +220,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-12">
-      {/* 1. Minimal Header */}
+      {/* 1. Header */}
       <AnimatedContent distance={20} duration={0.6} ease="power3.out" trigger="mount">
         <div className="text-center space-y-2.5 max-w-2xl mx-auto">
           <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
@@ -232,12 +232,12 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
         </div>
       </AnimatedContent>
 
-      {/* 2. Main Ingestion Workstation - Translucent Frosted Glass */}
+      {/* 2. Ingestion Workstation - Translucent Frosted Glass */}
       <AnimatedContent distance={30} delay={0.1} duration={0.7} ease="power3.out" trigger="mount">
         <div className="relative rounded-3xl bg-black/40 backdrop-blur-xl border border-white/10 p-6 sm:p-8 shadow-2xl space-y-6">
           {/* Learning Capability & Strategy Controller */}
           <div className="p-4 sm:p-5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/[0.08] flex flex-col md:flex-row md:items-center justify-between gap-5">
-            {/* Left: Learning Capability Meter */}
+            {/* Left: Capability Meter */}
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium uppercase tracking-wider text-slate-400">
@@ -279,7 +279,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
               </div>
             </div>
 
-            {/* Right: Learning Strategy Slider (RubberSegment) */}
+            {/* Right: Strategy Slider */}
             <div className="space-y-2">
               <div className="text-xs font-medium uppercase tracking-wider text-slate-400">
                 Learning Focus
@@ -328,7 +328,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
             </div>
           </div>
 
-          {/* Source Tabs (RubberSegment) */}
+          {/* Source Tabs */}
           <div className="w-full flex justify-center">
             <RubberSegment
               items={[
@@ -380,54 +380,26 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
             />
           </div>
 
-          {/* Input Form */}
+          {/* Form */}
           <form onSubmit={handleSynthesize} className="space-y-4">
-            {/* TAB 1: Website URL */}
             {activeTab === "url" && (
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <label htmlFor="url-input" className="block text-xs font-medium text-slate-300">
                   Article or Documentation Link
                 </label>
                 <input
                   id="url-input"
                   type="url"
-                  placeholder="https://www.w3schools.com/js/ or tutorial url..."
+                  placeholder="https://example.com/documentation-page..."
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-white/30 transition font-mono backdrop-blur-md"
                 />
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
-                  <span>Examples:</span>
-                  <button
-                    type="button"
-                    onClick={() => setUrlInput("https://www.w3schools.com/js/js_intro.asp")}
-                    className="px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-purple-300 text-[11px] transition cursor-pointer"
-                  >
-                    W3Schools JS
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setUrlInput("https://www.geeksforgeeks.org/css/introduction-to-tailwind-css/")
-                    }
-                    className="px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-purple-300 text-[11px] transition cursor-pointer"
-                  >
-                    Tailwind CSS
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setUrlInput("https://www.w3schools.com/react/default.asp")}
-                    className="px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-purple-300 text-[11px] transition cursor-pointer"
-                  >
-                    React Hooks
-                  </button>
-                </div>
               </div>
             )}
 
-            {/* TAB 2: Document File Upload */}
             {activeTab === "document" && (
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <label className="block text-xs font-medium text-slate-300">
                   Upload PDF, Slides or Markdown
                 </label>
@@ -457,9 +429,8 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
               </div>
             )}
 
-            {/* TAB 3: Raw Notes */}
             {activeTab === "notes" && (
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <label htmlFor="notes-input" className="block text-xs font-medium text-slate-300">
                   Notes or Topic Overview
                 </label>
@@ -474,7 +445,6 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
               </div>
             )}
 
-            {/* Course Title (Optional) */}
             <div>
               <label htmlFor="custom-title-input" className="block text-xs font-medium text-slate-400 mb-1.5">
                 Course Title (Optional)
@@ -482,7 +452,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
               <input
                 id="custom-title-input"
                 type="text"
-                placeholder="e.g. Modern Web Architecture"
+                placeholder="e.g. Distributed Systems Architecture"
                 value={customTitle}
                 onChange={(e) => setCustomTitle(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl bg-white/[0.03] border border-white/10 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-white/30 transition backdrop-blur-md"
@@ -495,7 +465,6 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
               </div>
             )}
 
-            {/* SpecularButton Action */}
             <div className="pt-2 flex flex-col items-center space-y-2">
               <SpecularButton
                 type="submit"
@@ -529,16 +498,73 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
         </div>
       </AnimatedContent>
 
-      {/* 3. MagicBento Interactive Grid Layout */}
-      <AnimatedContent distance={30} delay={0.2} duration={0.8} ease="power3.out" trigger="mount">
+      {/* 3. Past Tracks (Minimalist, like previous design) */}
+      <AnimatedContent distance={30} delay={0.2} duration={0.7} ease="power3.out" trigger="mount">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white tracking-tight">
+              Your Past Tracks
+            </h3>
+            {savedCourses.length > 0 && (
+              <span className="text-xs text-slate-500 font-mono">
+                {savedCourses.length} {savedCourses.length === 1 ? "track" : "tracks"} saved
+              </span>
+            )}
+          </div>
+
+          {savedCourses.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {savedCourses.map((c) => (
+                <div
+                  key={c.id}
+                  className="p-4 rounded-2xl bg-black/40 border border-white/10 backdrop-blur-md hover:border-white/20 transition-all flex items-center justify-between gap-4 group"
+                >
+                  <div className="space-y-1 min-w-0">
+                    <h5 className="text-sm font-medium text-white truncate group-hover:text-purple-300 transition-colors">
+                      {c.title}
+                    </h5>
+                    <p className="text-xs text-slate-400 truncate font-light">
+                      {c.description}
+                    </p>
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                        {c.totalTopics} {c.totalTopics === 1 ? "Topic" : "Topics"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => onSelectTopic(c.topic, c.title)}
+                    className="px-3.5 py-1.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.18] border border-white/10 text-white text-xs font-medium shrink-0 cursor-pointer transition-all active:scale-95"
+                  >
+                    Resume
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-6 rounded-2xl bg-black/20 border border-white/[0.06] backdrop-blur-sm text-center space-y-1.5">
+              <p className="text-xs text-slate-400 font-light">
+                No saved courses yet.
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Paste any link, upload a document, or enter notes above to generate your first adaptive course.
+              </p>
+            </div>
+          )}
+        </div>
+      </AnimatedContent>
+
+      {/* 4. Features Section (Separated below past tracks) */}
+      <AnimatedContent distance={30} delay={0.3} duration={0.8} ease="power3.out" trigger="mount">
+        <div className="space-y-4 pt-6 border-t border-white/[0.06]">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-semibold text-white tracking-tight">
-                Adaptive Capabilities & Instant Tracks
+              <h3 className="text-sm font-semibold text-white tracking-tight">
+                Platform Capabilities
               </h3>
               <p className="text-xs text-slate-400 font-light">
-                Hover to illuminate with cursor light. Click any track to auto-load documentation.
+                Built from the ground up for high-yield comprehension and verified skill mastery.
               </p>
             </div>
             <button
@@ -552,7 +578,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
 
           <MagicBento
             columns={4}
-            rowHeight={195}
+            rowHeight={190}
             gap={14}
             radius={20}
             theme="dark"
@@ -562,116 +588,59 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
             spotlightRadius={300}
             clickEffect={true}
             enableStars={true}
-            particleCount={20}
+            particleCount={18}
             items={[
               {
-                id: 'synthesis',
-                label: 'Gemini 3.5 Pipeline',
-                title: 'Tailwind CSS Architecture',
-                description: 'Auto-extracts design tokens, layout utility classes, and removes fluff.',
+                id: 'pipeline',
+                label: 'Gemini Pipeline',
+                title: 'Automated Fluff Removal',
+                description: 'Strips out cover pages, disclaimers, and acknowledgments to isolate actionable concepts.',
                 visual: 'automation',
                 colSpan: 2,
                 rowSpan: 2,
-                onClick: () => {
-                  setActiveTab('url');
-                  setUrlInput('https://www.geeksforgeeks.org/css/introduction-to-tailwind-css/');
-                  setCustomTitle('Tailwind CSS Architecture & Utility Classes');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
               },
               {
-                id: 'javascript',
-                label: 'Core Runtime',
-                title: 'JavaScript Deep Dive',
-                description: 'Prototypes, execution context, event loop, and closures step-by-step.',
+                id: 'adaptive',
+                label: 'Cognitive Engine',
+                title: 'Adaptive Topic Chunking',
+                description: 'Dynamically breaks complex material into structured chapters tuned to your exact level.',
                 visual: 'collaboration',
                 colSpan: 2,
                 rowSpan: 2,
-                onClick: () => {
-                  setActiveTab('url');
-                  setUrlInput('https://www.w3schools.com/js/');
-                  setCustomTitle('JavaScript Core Engine & Modern ES6+');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
               },
               {
                 id: 'analytics',
                 label: 'Telemetry',
-                title: 'Live Focus & Dwell',
-                description: 'Real-time BCS attention scoring & dwell benchmarks.',
+                title: 'Attention & Focus Dwell',
+                description: 'Real-time eye-gaze tracking and reading benchmarks.',
                 visual: 'analytics',
-                onClick: () => {
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
               },
               {
                 id: 'dashboard',
                 label: 'Capability',
-                title: 'Difficulty Scaling',
-                description: 'Dynamic adaptation from 1.0 to 10.0 level.',
+                title: 'Comprehension Scoring',
+                description: 'Live 1.0 to 10.0 level persisted to MongoDB Atlas.',
                 visual: 'dashboard',
-                onClick: () => {
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
               },
               {
-                id: 'integration',
-                label: 'Universal Ingestion',
-                title: 'React 19 Concurrency',
-                description: 'Hooks, Suspense boundaries, and Server Actions.',
+                id: 'universal',
+                label: 'Multi-Source',
+                title: 'Universal Ingestion',
+                description: 'Web pages, PDFs, slide decks, and class notes.',
                 visual: 'integration',
-                onClick: () => {
-                  setActiveTab('url');
-                  setUrlInput('https://www.w3schools.com/react/default.asp');
-                  setCustomTitle('React 19 Hooks & State Architecture');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
               },
               {
-                id: 'verification',
+                id: 'arena',
                 label: 'Phase 6 Defense',
-                title: 'Verification Arena',
-                description: 'Zero-clone audit, live Vercel check, and viva code defense.',
+                title: 'Proof-of-Work Arena',
+                description: 'Zero-clone audits and live AST vivas to catch vibe-coding.',
                 visual: 'security',
-                onClick: onOpenArena
-              }
+                onClick: onOpenArena,
+              },
             ]}
           />
         </div>
       </AnimatedContent>
-
-      {/* 4. Active Ingested Courses History */}
-      {savedCourses.length > 0 && (
-        <AnimatedContent distance={30} delay={0.3} duration={0.7} ease="power3.out" trigger="mount">
-          <div className="space-y-3 pt-4 border-t border-white/[0.08]">
-            <h3 className="text-sm font-semibold text-white tracking-tight">
-              Your Ingested Courses
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {savedCourses.map((c) => (
-                <div
-                  key={c.id}
-                  className="p-4 rounded-2xl bg-black/30 border border-white/10 backdrop-blur-md flex items-center justify-between gap-4"
-                >
-                  <div className="space-y-1 min-w-0">
-                    <h5 className="text-xs font-semibold text-white truncate">{c.title}</h5>
-                    <p className="text-[11px] text-slate-400 truncate">{c.description}</p>
-                    <span className="text-[10px] font-mono text-purple-400">
-                      {c.totalTopics} Topics
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => onSelectTopic(c.topic, c.title)}
-                    className="px-3 py-1.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] border border-white/10 text-white text-xs font-medium shrink-0 cursor-pointer transition"
-                  >
-                    Resume
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </AnimatedContent>
-      )}
     </div>
   );
 };
