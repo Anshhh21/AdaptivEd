@@ -1,22 +1,30 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AdaptiveChunkReader } from "../components/AdaptiveChunkReader";
 import { AIStudyHub } from "../components/AIStudyHub";
 import { AuthModal, UserSession } from "../components/AuthModal";
+import GradientWaves from "../components/GradientWaves";
 import { LessonCompleteModal } from "../components/LessonCompleteModal";
 import { SettingsModal } from "../components/SettingsModal";
+import SpecularButton from "../components/SpecularButton";
 import { TopicModule } from "../types/curriculum";
 
 export default function Home() {
+  const [hasStarted, setHasStarted] = useState<boolean>(false);
   const [currentView, setCurrentView] = useState<"hub" | "reader" | "arena">("hub");
   const [selectedTopic, setSelectedTopic] = useState<TopicModule | null>(null);
   const [selectedTechTitle, setSelectedTechTitle] = useState<string>("Adaptive Topic");
 
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const [authDefaultMode, setAuthDefaultMode] = useState<"signin" | "signup">("signup");
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isCompleteOpen, setIsCompleteOpen] = useState<boolean>(false);
+
+  // Profile dropdown menu toggle state
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState<boolean>(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Load user session on mount
   useEffect(() => {
@@ -26,11 +34,25 @@ export default function Home() {
         setUserSession(JSON.parse(stored));
       }
     } catch {
-      // Ignored in non-browser environments
+      // Browser storage fallback
     }
   }, []);
 
-  // When learner clicks a specific topic from the syllabus (e.g., Tailwind or Closures)
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  // When learner clicks a specific topic from the syllabus
   const handleSelectTopic = (topic: TopicModule, techName: string) => {
     setSelectedTopic(topic);
     setSelectedTechTitle(techName);
@@ -68,222 +90,352 @@ export default function Home() {
   const handleSignOut = () => {
     localStorage.removeItem("adaptived_user");
     setUserSession(null);
+    setIsProfileMenuOpen(false);
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30">
-      {/* 1. Minimalist Top Navigation Bar */}
-      <nav className="border-b border-slate-900 bg-slate-950/80 backdrop-blur sticky top-0 z-30 px-6 sm:px-8 py-3.5 flex items-center justify-between">
-        <button
-          onClick={() => setCurrentView("hub")}
-          className="flex items-center gap-3 hover:opacity-90 transition text-left cursor-pointer"
-        >
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20">
-            A
-          </div>
-          <div>
-            <div className="font-bold text-sm tracking-tight text-white flex items-center gap-2">
-              <span>AdaptivEd</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono">
-                NeuroLearn
-              </span>
-            </div>
-            <div className="text-[10px] text-slate-400">Behavioral Comprehension Engine</div>
-          </div>
-        </button>
+    <div className="relative min-h-screen bg-black text-slate-100 flex flex-col font-sans selection:bg-purple-500/30 overflow-x-hidden">
+      {/* Dynamic Background: GradientWaves WebGL2 Shader */}
+      <div className="fixed inset-0 z-0 pointer-events-auto">
+        <GradientWaves
+          horizonColor="#5227FF"
+          waveColor="#FF9FFC"
+          crestColor="#FFFFFF"
+          speed={0.3}
+          amplitude={2.5}
+          relief={1}
+          lightAngle={120}
+          mouseInteraction
+          swellOnClick
+          waveScale={0.49}
+          parallaxStrength={0.96}
+        />
+        {/* Subtle dark gradient overlay to ensure crystal clear typography readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black/75 pointer-events-none" />
+      </div>
 
-        {/* Right Action Icons: Settings & Account */}
-        <div className="flex items-center gap-3">
-          {/* Settings Button (Ablation Studio lives inside here) */}
+      {/* 1. Minimal Top Navigation Bar */}
+      <nav className="relative z-30 px-6 sm:px-12 py-5 flex items-center justify-between">
+        {/* Left side: Clean & empty as requested (removed AI Curriculum Synthesizer, badges, etc.) */}
+        <div>
+          {hasStarted && (
+            <button
+              onClick={() => {
+                setHasStarted(false);
+                setCurrentView("hub");
+              }}
+              type="button"
+              className="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer bg-white/[0.04] backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10"
+            >
+              <span>←</span>
+              <span>Home</span>
+            </button>
+          )}
+        </div>
+
+        {/* Right side: Profile Option with Outline Man Icon and Dropdown */}
+        <div className="relative" ref={profileMenuRef}>
           <button
-            onClick={() => setIsSettingsOpen(true)}
+            onClick={() => setIsProfileMenuOpen((prev) => !prev)}
             type="button"
-            className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700 transition cursor-pointer"
-            title="Open Platform Settings & Ablation Studio"
+            className="p-2.5 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 hover:border-white/20 transition-all cursor-pointer backdrop-blur-md flex items-center justify-center text-slate-300 hover:text-white"
+            aria-label="User Profile and Settings"
+            title="Profile & Settings"
           >
-            <span className="text-sm">⚙️</span>
+            {/* Outline Person Icon: Only lines, no colors filled inside */}
+            <svg
+              className="w-5 h-5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
           </button>
 
-          {/* User Sign Up / Profile Button */}
-          {userSession ? (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsAuthOpen(true)}
-                type="button"
-                className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs hover:border-slate-700 transition cursor-pointer"
-                title={`Logged in as ${userSession.email}`}
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span className="font-semibold text-white">{userSession.display_name}</span>
-                <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono text-[11px] font-bold">
-                  🎯 {(userSession.comprehension_score || 6.5).toFixed(1)}/10
-                </span>
-                <span className="text-amber-400 font-mono text-[11px]">🔥 {userSession.current_streak_days}d</span>
-                <span className="text-indigo-400 font-mono text-[11px]">+{userSession.total_xp} XP</span>
-              </button>
-              <button
-                onClick={handleSignOut}
-                type="button"
-                className="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-rose-400 text-xs transition cursor-pointer"
-                title="Sign Out"
-              >
-                Sign Out
-              </button>
+          {/* Text-Only Dropdown Menu */}
+          {isProfileMenuOpen && (
+            <div className="absolute right-0 mt-3 w-56 rounded-2xl bg-black/85 backdrop-blur-2xl border border-white/10 shadow-2xl p-2 z-50 animate-fadeIn">
+              {userSession ? (
+                <div className="px-3 py-2.5 border-b border-white/10 mb-1">
+                  <div className="text-xs font-medium text-white truncate">
+                    {userSession.display_name}
+                  </div>
+                  <div className="text-[11px] text-purple-300/80 font-mono mt-0.5">
+                    Level {(userSession.comprehension_score || 6.5).toFixed(1)}/10
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsProfileMenuOpen(false);
+                    setIsSettingsOpen(true);
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs font-normal text-slate-300 hover:text-white hover:bg-white/[0.06] rounded-xl transition-colors cursor-pointer"
+                >
+                  Settings
+                </button>
+
+                {!userSession ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        setAuthDefaultMode("signup");
+                        setIsAuthOpen(true);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs font-normal text-slate-300 hover:text-white hover:bg-white/[0.06] rounded-xl transition-colors cursor-pointer"
+                    >
+                      Sign Up
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsProfileMenuOpen(false);
+                        setAuthDefaultMode("signin");
+                        setIsAuthOpen(true);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs font-normal text-slate-300 hover:text-white hover:bg-white/[0.06] rounded-xl transition-colors cursor-pointer"
+                    >
+                      Sign In
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="w-full text-left px-3 py-2 text-xs font-normal text-rose-400/90 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Sign Out
+                  </button>
+                )}
+              </div>
             </div>
-          ) : (
-            <button
-              onClick={() => setIsAuthOpen(true)}
-              type="button"
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold text-white shadow-md shadow-indigo-600/20 transition cursor-pointer"
-            >
-              Sign Up / Sign In
-            </button>
           )}
         </div>
       </nav>
 
-      {/* 2. Main Viewport */}
-      <main className="flex-1">
-        {/* AI Learning & Ingestion Hub (All-In BYOC & Synthesis) */}
-        {currentView === "hub" && (
-          <AIStudyHub
-            onSelectTopic={handleSelectTopic}
-            onOpenArena={() => setCurrentView("arena")}
-            userSession={userSession}
-            onUpdateSession={setUserSession}
-          />
-        )}
+      {/* 2. Main Content Viewport */}
+      <main className="relative z-10 flex-1 flex flex-col justify-center">
+        {!hasStarted ? (
+          /* Landing Page: Center big bold AdaptivEd, statement line, and Specular "Get Started" button */
+          <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16 -mt-8">
+            <div className="max-w-3xl mx-auto flex flex-col items-center space-y-7">
+              {/* Big Bold AdaptivEd Title */}
+              <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-extrabold tracking-tight text-white select-none drop-shadow-2xl">
+                AdaptivEd
+              </h1>
 
-        {/* Minimalist Study Reader (Only opens when a topic is selected!) */}
-        {currentView === "reader" && (
-          <div className="space-y-4">
-            <div className="max-w-2xl mx-auto px-6 pt-4 flex items-center justify-between text-xs text-slate-400">
-              <button
-                onClick={() => setCurrentView("hub")}
-                className="hover:text-white transition flex items-center gap-1.5 cursor-pointer font-medium"
-              >
-                <span>← Back to AI Learning Hub</span>
-              </button>
-              <span className="font-mono text-indigo-400">{selectedTechTitle}</span>
-            </div>
+              {/* Subtitle Statement */}
+              <p className="max-w-xl text-slate-300/90 text-sm sm:text-base md:text-lg font-light leading-relaxed tracking-wide">
+                Learn in a new way by your own capacity, so that learning is fun
+                again with the help of AI.
+              </p>
 
-            {selectedTopic ? (
-              <AdaptiveChunkReader
-                lessonId={selectedTopic.slug}
-                lessonTitle={selectedTopic.title}
-                chunks={selectedTopic.chunks}
-                learnerId={userSession?.user_id || "learner_anonymous"}
-                onLessonComplete={handleLessonComplete}
-                onScoreUpdated={(newScore) => {
-                  if (userSession) {
-                    setUserSession((prev) => (prev ? { ...prev, comprehension_score: newScore } : null));
-                  }
-                }}
-              />
-            ) : (
-              <div className="max-w-md mx-auto py-20 text-center space-y-4">
-                <p className="text-slate-400 text-sm">No active topic selected.</p>
-                <button
-                  onClick={() => setCurrentView("hub")}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white text-xs font-semibold cursor-pointer transition"
+              {/* SpecularButton from React Bits */}
+              <div className="pt-4">
+                <SpecularButton
+                  size="lg"
+                  radius={18}
+                  tint="#ffffff"
+                  tintOpacity={0.06}
+                  textColor="#f5f5f5"
+                  lineColor="#ffffff"
+                  baseColor="#525252"
+                  intensity={1}
+                  idleIntensity={0.35}
+                  shineSize={10}
+                  shineFade={34}
+                  thickness={1.2}
+                  glow={1}
+                  followMouse
+                  proximity={250}
+                  onClick={() => setHasStarted(true)}
                 >
-                  Return to AI Learning Hub
-                </button>
+                  Get Started
+                </SpecularButton>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* AI Learning Hub / Workstation (Opened upon clicking Get Started) */
+          <div className="w-full pb-16 animate-fadeIn">
+            {currentView === "hub" && (
+              <AIStudyHub
+                onSelectTopic={handleSelectTopic}
+                onOpenArena={() => setCurrentView("arena")}
+                userSession={userSession}
+                onUpdateSession={setUserSession}
+              />
+            )}
+
+            {currentView === "reader" && (
+              <div className="space-y-4">
+                <div className="max-w-2xl mx-auto px-6 pt-4 flex items-center justify-between text-xs text-slate-400">
+                  <button
+                    onClick={() => setCurrentView("hub")}
+                    className="hover:text-white transition flex items-center gap-1.5 cursor-pointer font-medium"
+                  >
+                    <span>← Back to AI Learning Hub</span>
+                  </button>
+                  <span className="font-mono text-purple-400">{selectedTechTitle}</span>
+                </div>
+
+                {selectedTopic ? (
+                  <AdaptiveChunkReader
+                    lessonId={selectedTopic.slug}
+                    lessonTitle={selectedTopic.title}
+                    chunks={selectedTopic.chunks}
+                    learnerId={userSession?.user_id || "learner_anonymous"}
+                    onLessonComplete={handleLessonComplete}
+                    onScoreUpdated={(newScore) => {
+                      if (userSession) {
+                        setUserSession((prev) =>
+                          prev ? { ...prev, comprehension_score: newScore } : null
+                        );
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="max-w-md mx-auto py-20 text-center space-y-4">
+                    <p className="text-slate-400 text-sm">No active topic selected.</p>
+                    <button
+                      onClick={() => setCurrentView("hub")}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-xl text-white text-xs font-semibold cursor-pointer transition"
+                    >
+                      Return to AI Learning Hub
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {currentView === "arena" && (
+              <div className="max-w-4xl mx-auto px-6 py-12 space-y-8 animate-fadeIn">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs uppercase font-mono tracking-wider text-purple-400 mb-1">
+                      Phase 6 Verification
+                    </div>
+                    <h1 className="text-3xl font-extrabold text-white tracking-tight">
+                      Proof-of-Work Verification Arena
+                    </h1>
+                    <p className="text-slate-400 text-xs mt-1">
+                      Using AI is allowed, but blind vibe-coding is caught. Submit your production repository.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentView("hub")}
+                    className="text-xs px-4 py-2 rounded-xl bg-white/[0.05] border border-white/10 text-slate-300 hover:text-white transition cursor-pointer"
+                  >
+                    ← Back to Courses
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="p-6 rounded-2xl bg-black/60 border border-white/10 backdrop-blur-md space-y-3">
+                    <div className="text-sm font-bold text-white flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-purple-400"></span>
+                      <span>Tactic 1: Zero-Clone GitHub Tree Audit</span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Recursively inspects file hierarchies, hook architecture, and modularity without local cloning.
+                    </p>
+                    <div className="font-mono text-xs text-purple-300 bg-white/[0.03] p-2.5 rounded-lg border border-white/10">
+                      POST /api/v1/arena/audit-repo
+                    </div>
+                  </div>
+
+                  <div className="p-6 rounded-2xl bg-black/60 border border-white/10 backdrop-blur-md space-y-3">
+                    <div className="text-sm font-bold text-white flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                      <span>Tactic 2: Live Vercel Deployment Check</span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Real-time HTTP probing, SSL verification, sub-150ms TTFB latency benchmarks, and OpenGraph audit.
+                    </p>
+                    <div className="font-mono text-xs text-emerald-400 bg-white/[0.03] p-2.5 rounded-lg border border-white/10">
+                      POST /api/v1/arena/audit-deployment
+                    </div>
+                  </div>
+
+                  <div className="p-6 rounded-2xl bg-black/60 border border-white/10 backdrop-blur-md space-y-3">
+                    <div className="text-sm font-bold text-white flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                      <span>Tactic 3: AST-Driven Architectural Viva</span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      3 timed defense questions referencing candidate's exact line numbers to catch LLM hallucination.
+                    </p>
+                    <div className="font-mono text-xs text-amber-300 bg-white/[0.03] p-2.5 rounded-lg border border-white/10">
+                      POST /api/v1/arena/viva/generate
+                    </div>
+                  </div>
+
+                  <div className="p-6 rounded-2xl bg-black/60 border border-white/10 backdrop-blur-md space-y-3">
+                    <div className="text-sm font-bold text-white flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-rose-400"></span>
+                      <span>Tactic 4: Live Chaos / Sabotage Debugging</span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Injected track-specific production bugs (stale closures, ESR violations) fixed inside Monaco Editor.
+                    </p>
+                    <div className="font-mono text-xs text-rose-300 bg-white/[0.03] p-2.5 rounded-lg border border-white/10">
+                      POST /api/v1/arena/chaos/verify
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
         )}
-
-        {/* Proof-of-Work Arena */}
-        {currentView === "arena" && (
-          <div className="max-w-4xl mx-auto px-6 py-12 space-y-8 animate-fadeIn">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs uppercase font-mono tracking-wider text-indigo-400 mb-1">
-                  Phase 6 Verification
-                </div>
-                <h1 className="text-3xl font-extrabold text-white tracking-tight">
-                  Proof-of-Work Verification Arena
-                </h1>
-                <p className="text-slate-400 text-xs mt-1">
-                  Using AI is allowed, but blind vibe-coding is caught. Submit your production repository.
-                </p>
-              </div>
-
-              <button
-                onClick={() => setCurrentView("hub")}
-                className="text-xs px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition cursor-pointer"
-              >
-                ← Back to Courses
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
-                <div className="text-sm font-bold text-white flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-indigo-400"></span>
-                  <span>Tactic 1: Zero-Clone GitHub Tree Audit</span>
-                </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Recursively inspects file hierarchies, hook architecture, and modularity without local cloning.
-                </p>
-                <div className="font-mono text-xs text-emerald-400 bg-slate-950 p-2.5 rounded-lg border border-slate-850">
-                  POST /api/v1/arena/audit-repo
-                </div>
-              </div>
-
-              <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
-                <div className="text-sm font-bold text-white flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-                  <span>Tactic 2: Live Vercel Deployment Check</span>
-                </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Real-time HTTP probing, SSL verification, sub-150ms TTFB latency benchmarks, and OpenGraph audit.
-                </p>
-                <div className="font-mono text-xs text-emerald-400 bg-slate-950 p-2.5 rounded-lg border border-slate-850">
-                  POST /api/v1/arena/audit-deployment
-                </div>
-              </div>
-
-              <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
-                <div className="text-sm font-bold text-white flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                  <span>Tactic 3: AST-Driven Architectural Viva</span>
-                </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  3 timed defense questions referencing candidate's exact line numbers to catch LLM hallucination.
-                </p>
-                <div className="font-mono text-xs text-emerald-400 bg-slate-950 p-2.5 rounded-lg border border-slate-850">
-                  POST /api/v1/arena/viva/generate
-                </div>
-              </div>
-
-              <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
-                <div className="text-sm font-bold text-white flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-rose-400"></span>
-                  <span>Tactic 4: Live Chaos / Sabotage Debugging</span>
-                </div>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Injected track-specific production bugs (stale closures, ESR violations) fixed inside Monaco Editor.
-                </p>
-                <div className="font-mono text-xs text-emerald-400 bg-slate-950 p-2.5 rounded-lg border border-slate-850">
-                  POST /api/v1/arena/chaos/verify
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
 
-      {/* Auth / Account Profile Modal (Sign Up First + Google Auth) */}
+      {/* 3. Clean Footer with LinkedIn and GitHub links */}
+      <footer className="relative z-10 border-t border-white/[0.06] py-6 px-6 sm:px-12 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-400 bg-black/30 backdrop-blur-sm">
+        <div className="text-slate-500 font-light">
+          AdaptivEd • Adaptive Cognitive Comprehension Engine
+        </div>
+        <div className="flex items-center gap-6">
+          <a
+            href="https://www.linkedin.com/in/ansh-sharma-855572237/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-white transition-colors flex items-center gap-1.5"
+          >
+            <span>LinkedIn</span>
+            <span className="text-[10px] text-slate-600">↗</span>
+          </a>
+          <a
+            href="https://github.com/Anshhh21/AdaptivEd.git"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-white transition-colors flex items-center gap-1.5"
+          >
+            <span>GitHub</span>
+            <span className="text-[10px] text-slate-600">↗</span>
+          </a>
+        </div>
+      </footer>
+
+      {/* Auth Modal (Sign Up / Sign In) */}
       <AuthModal
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onLoginSuccess={(session) => setUserSession(session)}
-        defaultMode="signup"
+        defaultMode={authDefaultMode}
       />
 
-      {/* Settings Modal (Ablation Studio is housed here) */}
+      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
