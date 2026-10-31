@@ -7,6 +7,7 @@ import { useFullscreenLock } from "../hooks/useFullscreenLock";
 import { BCSEvaluationResponse, ChunkTelemetryPayload, CognitiveState } from "../types/telemetry";
 import { DeveloperXRayDrawer } from "./DeveloperXRayDrawer";
 import { FocusLockShield } from "./FocusLockShield";
+import { WebcamAttentionTile } from "./WebcamAttentionTile";
 
 export interface SemanticChunkData {
   id: string;
@@ -63,7 +64,15 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
   const { isLockedInFocus, blockReason, requestFullscreenLock } = useFullscreenLock();
 
   // Local MediaPipe 2-FPS Vision Attention Tracker
-  const { attentionScore, requestCameraAccess, hasCameraPermission } = useAttentionTracker(true);
+  const {
+    videoRef,
+    attentionScore,
+    faceDetected,
+    isTracking,
+    hasCameraPermission,
+    requestCameraAccess,
+    stopTracking,
+  } = useAttentionTracker(true);
 
   const currentChunk = chunks[activeChunkIndex] || null;
 
@@ -193,52 +202,52 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
         onRequestFullscreen={requestFullscreenLock}
       />
 
-      {/* 2. Top Adaptive Navigation Bar */}
-      <header className="border-b border-slate-900 bg-slate-950/80 backdrop-blur sticky top-0 z-20 px-8 py-4 flex items-center justify-between">
+      {/* 2. Top Minimalist Study Navigation */}
+      <header className="border-b border-slate-900 bg-slate-950/80 backdrop-blur sticky top-0 z-20 px-8 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <span className="text-xs uppercase font-semibold tracking-wider text-indigo-400">
+          <span className="text-xs font-semibold text-slate-300">
             {lessonTitle}
           </span>
-          <span className="text-slate-700">/</span>
-          <span className="text-xs font-mono text-slate-400">
-            Chunk {activeChunkIndex + 1} of {chunks.length}
-          </span>
+          <div className="hidden sm:flex items-center gap-1.5 bg-slate-900 px-3 py-1 rounded-full border border-slate-800">
+            <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-indigo-500 rounded-full transition-all duration-300"
+                style={{ width: `${((activeChunkIndex + 1) / chunks.length) * 100}%` }}
+              ></div>
+            </div>
+            <span className="text-[11px] font-mono text-slate-400">
+              {activeChunkIndex + 1} / {chunks.length}
+            </span>
+          </div>
         </div>
 
-        {/* Real-time Telemetry HUD Pill */}
+        {/* Clean Focus Status Badge (Overwhelming numbers moved to X-Ray drawer) */}
         <div className="flex items-center gap-3">
-          {!hasCameraPermission && (
-            <button
-              onClick={requestCameraAccess}
-              className="text-xs px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 transition"
-              title="Enable client-only 2-FPS attention verification"
-            >
-              Enable Vision
-            </button>
-          )}
-
           <div
-            className={`px-3 py-1 rounded-full text-xs font-mono border flex items-center gap-2 ${getBadgeColor(
+            className={`px-3 py-1 rounded-full text-xs font-medium border flex items-center gap-2 ${getBadgeColor(
               activeEvaluation?.cognitive_state
             )}`}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></span>
-            <span>{activeEvaluation?.cognitive_state || "CALIBRATING"}</span>
-            {activeEvaluation?.score !== undefined && (
-              <span className="opacity-75 font-semibold">
-                ({Math.round(activeEvaluation.score * 100)}%)
-              </span>
-            )}
+            <span>
+              {activeEvaluation?.cognitive_state === "OPTIMAL"
+                ? "Deep Focus"
+                : activeEvaluation?.cognitive_state === "OVERLOADED"
+                ? "Reviewing Concepts"
+                : activeEvaluation?.cognitive_state === "SKIMMING"
+                ? "Fast Paced"
+                : "Focus Active"}
+            </span>
           </div>
         </div>
       </header>
 
-      {/* 3. Main Reading Area */}
-      <main className="flex-1 max-w-3xl w-full mx-auto px-6 py-12 flex flex-col justify-between">
+      {/* 3. Main Reading Area (Minimalist Typography) */}
+      <main className="flex-1 max-w-2xl w-full mx-auto px-6 py-12 flex flex-col justify-between">
         <div ref={containerRef} className="space-y-6">
           {/* Chunk Header */}
           <div className="flex items-center justify-between border-b border-slate-900 pb-4">
-            <h1 className="text-2xl font-bold text-white tracking-tight">
+            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
               {currentChunk.title || `Concept Section ${activeChunkIndex + 1}`}
             </h1>
 
@@ -248,16 +257,16 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
                 onClick={() =>
                   setActiveViewMode((prev) => (prev === "ORIGINAL" ? "ADAPTED" : "ORIGINAL"))
                 }
-                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 transition flex items-center gap-1.5"
+                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 hover:bg-indigo-500/20 transition flex items-center gap-1.5 cursor-pointer"
               >
-                <span>{activeViewMode === "ORIGINAL" ? "View Visual Analogy" : "View Original Deep Dive"}</span>
+                <span>{activeViewMode === "ORIGINAL" ? "Visual Analogy" : "Deep Dive"}</span>
               </button>
             )}
           </div>
 
           {/* Dynamic Content View (Original vs Morphed Analogy) */}
           {activeViewMode === "ORIGINAL" ? (
-            <div className="prose prose-invert prose-slate max-w-none text-slate-300 text-base leading-relaxed">
+            <div className="prose prose-invert prose-slate max-w-none text-slate-200 text-base leading-relaxed space-y-4">
               <p>{currentChunk.content}</p>
             </div>
           ) : (
@@ -290,25 +299,35 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
           <button
             onClick={handlePrevChunk}
             disabled={activeChunkIndex === 0}
-            className="px-5 py-2.5 rounded-xl text-sm font-medium border border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition"
+            className="px-5 py-2.5 rounded-xl text-xs font-medium border border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
           >
-            Previous
+            ← Previous
           </button>
 
-          <div className="text-xs font-mono text-slate-400">
-            Dwell: {Math.round(livePayload.active_dwell_time_ms / 1000)}s / Target:{" "}
-            {Math.round(currentChunk.target_dwell_ms / 1000)}s
-          </div>
+          <span className="text-xs text-slate-500 font-sans">
+            Section {activeChunkIndex + 1} of {chunks.length}
+          </span>
 
           <button
             onClick={handleNextChunk}
             disabled={isSpeedCheckOpen}
-            className="px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 transition cursor-pointer"
+            className="px-6 py-2.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 disabled:opacity-50 transition cursor-pointer shadow-lg shadow-indigo-600/20"
           >
-            {activeChunkIndex === chunks.length - 1 ? "Complete Lesson" : "Next Concept"}
+            {activeChunkIndex === chunks.length - 1 ? "Complete Lesson ✓" : "Next Concept →"}
           </button>
         </div>
       </main>
+
+      {/* Floating Picture-in-Picture Webcam Focus Tile */}
+      <WebcamAttentionTile
+        videoRef={videoRef}
+        isTracking={isTracking}
+        hasCameraPermission={hasCameraPermission}
+        attentionScore={attentionScore}
+        faceDetected={faceDetected}
+        onRequestCamera={requestCameraAccess}
+        onStopCamera={stopTracking}
+      />
 
       {/* 5. In-line Conceptual Speed-Check Modal (Gated Skimming Prevention) */}
       {isSpeedCheckOpen && currentChunk.speed_check && (

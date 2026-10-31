@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints.arena import router as arena_router
+from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.byoc import router as byoc_router
 from app.api.v1.endpoints.leaderboard import router as leaderboard_router
 from app.api.v1.endpoints.lessons import router as lessons_router
@@ -7,6 +8,9 @@ from app.api.v1.endpoints.telemetry import router as telemetry_router
 from app.schemas.base import ResponseEnvelope
 
 api_v1_router = APIRouter()
+
+# Mount Authentication & User Profile Subsystem
+api_v1_router.include_router(auth_router, prefix="", tags=["Auth"])
 
 # Mount Telemetry Streaming & Scoring Subsystem
 api_v1_router.include_router(telemetry_router, prefix="", tags=["Telemetry"])
