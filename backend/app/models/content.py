@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Dict, List, Optional
-from beanie import Document, Indexed
+from typing import Dict, List, Optional, Union
+from beanie import Document, Indexed, PydanticObjectId
 from pydantic import Field
 from app.schemas.base import AppBaseModel
 
@@ -43,6 +43,8 @@ class SemanticChunk(Document):
     Stores lexical complexity metrics and cached dynamic morphing outputs.
     """
 
+    id: Optional[Union[PydanticObjectId, str]] = None
+    chunk_id: Optional[str] = None
     lesson_id: Indexed(str)
     chunk_index: int = Field(ge=0, description="0-indexed position within the lesson.")
     title: Optional[str] = None

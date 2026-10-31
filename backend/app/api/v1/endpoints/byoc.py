@@ -29,6 +29,7 @@ class BYOCIngestionResult(AppBaseModel):
     mean_cosine_similarity: float
     threshold_tau: float
     status_message: str
+    chunks: list = Field(default_factory=list)
 
 
 def _slugify(text: str) -> str:
@@ -62,7 +63,8 @@ def _extract_text_from_pdf(file_bytes: bytes) -> str:
 
 @router.post("/byoc/upload", response_model=ResponseEnvelope[BYOCIngestionResult], tags=["BYOC"])
 async def upload_byoc_content(
-    file: UploadFile = File(..., description="Markdown (.md, .txt) or PDF file to calibrate."),
+    file: Optional[UploadFile] = File(default=None, description="Markdown (.md, .txt) or PDF file to calibrate."),
+    raw_text_input: Optional[str] = Form(default=None, description="Direct text or notes pasted by user."),
     title: str = Form(..., min_length=3, max_length=120),
     description: Optional[str] = Form(default="Custom uploaded material running in dynamic sandbox calibration."),
     chunker_strategy: Literal["semantic_neural", "tfidf_lsa"] = Form(
@@ -74,34 +76,34 @@ async def upload_byoc_content(
 ) -> ResponseEnvelope[BYOCIngestionResult]:
     """
     Bring Your Own Content (BYOC) Ingestion Pipeline:
-    1. Extracts raw text from Markdown or PDF bytes.
+    1. Extracts raw text from Markdown, PDF bytes, or direct text input.
     2. Runs text through the selected sliding-window semantic chunker.
     3. Dynamically assigns Flesch-Kincaid complexity and target dwell baselines.
     4. Persists the new Lesson and SemanticChunks under TrackTier.BYOC_SANDBOX.
     """
-    raw_bytes = await file.read()
-    if not raw_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Uploaded file is empty.",
-        )
+    raw_text = ""
+    filename = "custom_notes.txt"
 
-    filename = file.filename or "upload.txt"
-    file_ext = filename.lower().split(".")[-1]
+    if file is not None and file.filename:
+        filename = file.filename
+        raw_bytes = await file.read()
+        if raw_bytes:
+            file_ext = filename.lower().split(".")[-1]
+            if file_ext == "pdf":
+                raw_text = _extract_text_from_pdf(raw_bytes)
+            else:
+                try:
+                    raw_text = raw_bytes.decode("utf-8")
+                except UnicodeDecodeError:
+                    raw_text = raw_bytes.decode("latin-1", errors="replace")
 
-    # Extract text based on file format
-    if file_ext == "pdf":
-        raw_text = _extract_text_from_pdf(raw_bytes)
-    else:
-        try:
-            raw_text = raw_bytes.decode("utf-8")
-        except UnicodeDecodeError:
-            raw_text = raw_bytes.decode("latin-1", errors="replace")
+    if not raw_text and raw_text_input and raw_text_input.strip():
+        raw_text = raw_text_input.strip()
 
     if len(raw_text.strip()) < 50:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Extracted text is too short to construct semantic chunks (minimum 50 characters required).",
+            detail="Content is too short to construct semantic chunks (minimum 50 characters required).",
         )
 
     # Instantiate chosen chunking strategy
@@ -162,6 +164,21 @@ async def upload_byoc_content(
         )
         await chunk_doc.insert()
 
+    # Format chunks for direct frontend consumption
+    serialized_chunks = [
+        {
+            "id": f"byoc-{slug}-{c.chunk_index}",
+            "chunk_index": c.chunk_index,
+            "title": f"Section {c.chunk_index + 1}",
+            "content": c.content,
+            "sentence_count": c.sentence_count,
+            "word_count": c.word_count,
+            "flesch_kincaid_grade": c.flesch_kincaid_grade,
+            "target_dwell_ms": c.target_dwell_ms,
+        }
+        for c in chunking_result.chunks
+    ]
+
     result_payload = BYOCIngestionResult(
         lesson_id=str(lesson.id),
         slug=slug,
@@ -173,6 +190,7 @@ async def upload_byoc_content(
         chunking_strategy=chunking_result.model_name,
         mean_cosine_similarity=chunking_result.mean_cosine_similarity,
         threshold_tau=chunking_result.threshold_tau,
+        chunks=serialized_chunks,
         status_message=(
             f"Successfully ingested and calibrated '{title}' into {chunking_result.total_chunks} "
             f"semantic chunks via {chunking_result.model_name}."

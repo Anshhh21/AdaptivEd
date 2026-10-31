@@ -47,6 +47,8 @@ class LearnerProfile(Document):
     user_id: Indexed(str, unique=True)
     email: Indexed(str, unique=True)
     display_name: str
+    password_hash: Optional[str] = None
+    auth_provider: str = Field(default="email", description="'email' | 'google'")
 
     # Cognitive & Behavioral Calibration
     baseline: CognitiveBaseline = Field(default_factory=CognitiveBaseline)

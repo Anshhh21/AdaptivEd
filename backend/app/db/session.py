@@ -24,7 +24,9 @@ class DatabaseManager:
         and initializes Beanie ODM with the registered document schemas.
         """
         settings = get_settings()
-        connection_url = str(settings.MONGODB_URI)
+        connection_url = str(settings.MONGODB_URI).strip()
+        if connection_url.startswith("mongodb+srv://") and ":27017" in connection_url:
+            connection_url = connection_url.replace(":27017", "")
 
         logger.info("Initializing async MongoDB connection pool...")
         try:

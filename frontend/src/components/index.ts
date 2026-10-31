@@ -6,3 +6,6 @@ export { WebcamAttentionTile } from "./WebcamAttentionTile";
 export { TrackCatalog, VERIFIED_TRACKS } from "./TrackCatalog";
 export { AuthModal } from "./AuthModal";
 export { LessonCompleteModal } from "./LessonCompleteModal";
+export { DomainHub } from "./DomainHub";
+export { SettingsModal } from "./SettingsModal";
+export { BYOCModal } from "./BYOCModal";

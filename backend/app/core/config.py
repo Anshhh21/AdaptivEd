@@ -1,7 +1,15 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import List, Literal
 from pydantic import Field, MongoDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+_ENV_PATHS = (
+    str(_BACKEND_DIR / ".env"),
+    "backend/.env",
+    ".env",
+)
 
 
 class Settings(BaseSettings):
@@ -12,7 +20,7 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_PATHS,
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",
@@ -38,8 +46,8 @@ class Settings(BaseSettings):
     )
 
     # Database: MongoDB Atlas / Local Replica
-    MONGODB_URI: MongoDsn = Field(
-        default=MongoDsn("mongodb://localhost:27017"),
+    MONGODB_URI: str = Field(
+        default="mongodb://localhost:27017",
         description="Async MongoDB connection string with authentication and replica set options.",
     )
     DATABASE_NAME: str = Field(default="adaptived_db", min_length=1)
