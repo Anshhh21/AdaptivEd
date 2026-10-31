@@ -199,14 +199,19 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
     Record<number, { isCorrect: boolean; text: string }>
   >({});
   const [inlineVerified, setInlineVerified] = useState<Record<number, boolean>>({});
+  const [passedChunks, setPassedChunks] = useState<Record<number, boolean>>({});
 
   const handleSelectInlineOption = (optIdx: number) => {
+    // If user already passed this concept, freeze selection to prevent point farming
+    if (passedChunks[activeChunkIndex]) return;
+
     setInlineAnswers((prev) => ({ ...prev, [activeChunkIndex]: optIdx }));
     setInlineFeedback((prev) => {
       const next = { ...prev };
       delete next[activeChunkIndex];
       return next;
     });
+    setInlineVerified((prev) => ({ ...prev, [activeChunkIndex]: false }));
   };
 
   const handleVerifyInlineAnswer = async () => {
@@ -216,10 +221,17 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
     const selected = inlineAnswers[activeChunkIndex];
     if (selected === undefined || selected === null) return;
 
+    // Prevent repeated re-evaluation if question is already verified and passed
+    if (passedChunks[activeChunkIndex]) return;
+
     const isCorrect = selected === speedCheck.correct_option_index;
     const dwellSeconds = Math.max(1, Math.round((Date.now() - chunkStartTimeRef.current) / 1000));
 
     setInlineVerified((prev) => ({ ...prev, [activeChunkIndex]: true }));
+    if (isCorrect) {
+      setPassedChunks((prev) => ({ ...prev, [activeChunkIndex]: true }));
+    }
+
     setInlineFeedback((prev) => ({
       ...prev,
       [activeChunkIndex]: {
@@ -678,21 +690,30 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
                 )}
 
                 <div className="pt-2">
-                  <SpecularButton
-                    size="md"
-                    radius={14}
-                    tint="#ffffff"
-                    tintOpacity={0.06}
-                    textColor="#ffffff"
-                    lineColor="#ffffff"
-                    baseColor="#555555"
-                    intensity={1.2}
-                    idleIntensity={0.5}
-                    onClick={handleVerifyInlineAnswer}
-                    disabled={inlineAnswers[activeChunkIndex] === undefined || inlineAnswers[activeChunkIndex] === null}
-                  >
-                    {inlineVerified[activeChunkIndex] ? "Re-evaluate Answer" : "Judge My Answer"}
-                  </SpecularButton>
+                  {passedChunks[activeChunkIndex] || (inlineVerified[activeChunkIndex] && inlineFeedback[activeChunkIndex]?.isCorrect) ? (
+                    <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span>Answer Verified</span>
+                    </div>
+                  ) : (
+                    <SpecularButton
+                      size="md"
+                      radius={14}
+                      tint="#ffffff"
+                      tintOpacity={0.06}
+                      textColor="#ffffff"
+                      lineColor="#ffffff"
+                      baseColor="#555555"
+                      intensity={1.2}
+                      idleIntensity={0.5}
+                      onClick={handleVerifyInlineAnswer}
+                      disabled={inlineAnswers[activeChunkIndex] === undefined || inlineAnswers[activeChunkIndex] === null}
+                    >
+                      Judge My Answer
+                    </SpecularButton>
+                  )}
                 </div>
               </div>
             )}

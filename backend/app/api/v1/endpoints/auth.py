@@ -384,11 +384,35 @@ async def update_learning_progress(payload: ProgressUpdateRequest) -> ResponseEn
     try:
         profile = await LearnerProfile.find_one(LearnerProfile.user_id == payload.user_id)
         if profile:
+            # Prevent duplicate score inflation: Check if this lesson/chunk was already passed
+            tp = profile.tracks.get(payload.track_id)
+            already_completed = tp is not None and payload.lesson_id in tp.completed_lesson_ids
+
+            old_score = getattr(profile, "comprehension_score", 6.5) or 6.5
+            active_strategy = payload.learning_strategy or getattr(profile, "learning_strategy", "DIFFICULTY_FIRST") or "DIFFICULTY_FIRST"
+
+            if already_completed and payload.quiz_passed:
+                # Already verified and passed: Maintain existing score without compounding
+                logger.info(f"Chunk/lesson {payload.lesson_id} already completed for {payload.user_id}. Score preserved at {old_score}.")
+                return ResponseEnvelope(
+                    success=True,
+                    data={
+                        "total_xp": profile.total_xp,
+                        "current_streak_days": profile.current_streak_days,
+                        "comprehension_score": old_score,
+                        "previous_score": old_score,
+                        "score_delta": 0.0,
+                        "feedback": "Concept already verified. Score maintained.",
+                        "learning_strategy": profile.learning_strategy,
+                        "total_topics_learned": getattr(profile, "total_topics_learned", 0) or 0,
+                        "track_progress": tp.model_dump() if tp else {},
+                    },
+                    message="Concept already verified. Comprehension score maintained.",
+                )
+
             profile.total_xp += payload.xp_earned
 
             # Calculate updated 1.0 - 10.0 comprehension score
-            old_score = getattr(profile, "comprehension_score", 6.5) or 6.5
-            active_strategy = payload.learning_strategy or getattr(profile, "learning_strategy", "DIFFICULTY_FIRST") or "DIFFICULTY_FIRST"
             new_score, feedback = calculate_comprehension_delta(
                 current_score=old_score,
                 quiz_passed=payload.quiz_passed,
@@ -397,7 +421,8 @@ async def update_learning_progress(payload: ProgressUpdateRequest) -> ResponseEn
                 learning_strategy=active_strategy,
             )
             profile.comprehension_score = new_score
-            profile.total_topics_learned = getattr(profile, "total_topics_learned", 0) + 1
+            if payload.quiz_passed:
+                profile.total_topics_learned = getattr(profile, "total_topics_learned", 0) + 1
             if payload.learning_strategy:
                 profile.learning_strategy = payload.learning_strategy
 
@@ -417,17 +442,18 @@ async def update_learning_progress(payload: ProgressUpdateRequest) -> ResponseEn
             profile.comprehension_history.insert(0, audit_entry)
             profile.comprehension_history = profile.comprehension_history[:50]
 
-            if payload.track_id not in profile.tracks:
-                profile.tracks[payload.track_id] = TrackProgress(
-                    track_id=payload.track_id,
-                    completed_lesson_ids=[payload.lesson_id],
-                    average_bcs=payload.bcs_score,
-                )
-            else:
-                tp = profile.tracks[payload.track_id]
-                if payload.lesson_id not in tp.completed_lesson_ids:
-                    tp.completed_lesson_ids.append(payload.lesson_id)
-                tp.average_bcs = round((tp.average_bcs + payload.bcs_score) / 2.0, 3)
+            if payload.quiz_passed:
+                if payload.track_id not in profile.tracks:
+                    profile.tracks[payload.track_id] = TrackProgress(
+                        track_id=payload.track_id,
+                        completed_lesson_ids=[payload.lesson_id],
+                        average_bcs=payload.bcs_score,
+                    )
+                else:
+                    tp = profile.tracks[payload.track_id]
+                    if payload.lesson_id not in tp.completed_lesson_ids:
+                        tp.completed_lesson_ids.append(payload.lesson_id)
+                    tp.average_bcs = round((tp.average_bcs + payload.bcs_score) / 2.0, 3)
 
             profile.updated_at = datetime.now(timezone.utc)
             await profile.save()
