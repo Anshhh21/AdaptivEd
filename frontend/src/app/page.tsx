@@ -97,22 +97,28 @@ export default function Home() {
   return (
     <div className="relative min-h-screen bg-black text-slate-100 flex flex-col font-sans selection:bg-purple-500/30 overflow-x-hidden">
       {/* Dynamic Background: GradientWaves WebGL2 Shader */}
-      <div className="fixed inset-0 z-0 pointer-events-auto">
+      <div className={`fixed inset-0 z-0 pointer-events-auto transition-opacity duration-700 ${currentView === "reader" ? "opacity-25" : "opacity-100"}`}>
         <GradientWaves
           horizonColor="#5227FF"
           waveColor="#FF9FFC"
           crestColor="#FFFFFF"
-          speed={0.3}
-          amplitude={2.5}
-          relief={1}
+          speed={currentView === "reader" ? 0.15 : 0.3}
+          amplitude={currentView === "reader" ? 1.5 : 2.5}
+          relief={currentView === "reader" ? 0.5 : 1}
           lightAngle={120}
-          mouseInteraction
-          swellOnClick
+          mouseInteraction={currentView !== "reader"}
+          swellOnClick={currentView !== "reader"}
           waveScale={0.49}
-          parallaxStrength={0.96}
+          parallaxStrength={currentView === "reader" ? 0.2 : 0.96}
         />
-        {/* Subtle dark gradient overlay to ensure crystal clear typography readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/45 to-black/75 pointer-events-none" />
+        {/* Dark overlay ensuring words are the highest priority */}
+        <div
+          className={`absolute inset-0 pointer-events-none transition-colors duration-500 ${
+            currentView === "reader"
+              ? "bg-black/92 backdrop-blur-md"
+              : "bg-gradient-to-b from-black/55 via-black/45 to-black/75"
+          }`}
+        />
       </div>
 
       {/* 1. Minimal Top Navigation Bar */}
@@ -283,17 +289,7 @@ export default function Home() {
             )}
 
             {currentView === "reader" && (
-              <div className="space-y-4">
-                <div className="max-w-2xl mx-auto px-6 pt-4 flex items-center justify-between text-xs text-slate-400">
-                  <button
-                    onClick={() => setCurrentView("hub")}
-                    className="hover:text-white transition flex items-center gap-1.5 cursor-pointer font-medium"
-                  >
-                    <span>← Back to AI Learning Hub</span>
-                  </button>
-                  <span className="font-mono text-purple-400">{selectedTechTitle}</span>
-                </div>
-
+              <div>
                 {selectedTopic ? (
                   <AdaptiveChunkReader
                     lessonId={selectedTopic.slug}
@@ -301,6 +297,7 @@ export default function Home() {
                     chunks={selectedTopic.chunks}
                     learnerId={userSession?.user_id || "learner_anonymous"}
                     onLessonComplete={handleLessonComplete}
+                    onBack={() => setCurrentView("hub")}
                     onScoreUpdated={(newScore) => {
                       if (userSession) {
                         setUserSession((prev) =>
@@ -314,9 +311,9 @@ export default function Home() {
                     <p className="text-slate-400 text-sm">No active topic selected.</p>
                     <button
                       onClick={() => setCurrentView("hub")}
-                      className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-xl text-white text-xs font-semibold cursor-pointer transition"
+                      className="px-4 py-2 bg-white/[0.08] hover:bg-white/[0.15] border border-white/10 rounded-xl text-white text-xs font-semibold cursor-pointer transition"
                     >
-                      Return to AI Learning Hub
+                      Return to Courses
                     </button>
                   </div>
                 )}

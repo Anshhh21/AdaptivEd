@@ -1,6 +1,8 @@
 "use client";
 
 import React from "react";
+import AnimatedContent from "./AnimatedContent";
+import SpecularButton from "./SpecularButton";
 import { FocusBlockReason } from "../types/telemetry";
 
 interface FocusLockShieldProps {
@@ -9,12 +11,6 @@ interface FocusLockShieldProps {
   onRequestFullscreen: () => Promise<boolean>;
 }
 
-/**
- * FocusLockShield Component
- * Un-dismissible immersive visual barrier presented whenever the student exits fullscreen,
- * switches tabs, or loses operating system window focus.
- * Blurs active learning material and pauses all cognitive telemetry.
- */
 export const FocusLockShield: React.FC<FocusLockShieldProps> = ({
   isLockedInFocus,
   blockReason,
@@ -28,30 +24,27 @@ export const FocusLockShield: React.FC<FocusLockShieldProps> = ({
     switch (blockReason) {
       case "NOT_FULLSCREEN":
         return {
-          title: "Deep-Focus Fullscreen Required",
-          description:
-            "AdaptivEd's behavioral comprehension engine and XP streaks require an uninterrupted visual field. Enter fullscreen mode to resume your session.",
-          actionText: "Enter Fullscreen Mode",
+          title: "Fullscreen Focus",
+          description: "Deep learning requires an uninterrupted field of view. Step into fullscreen to continue your session.",
+          actionText: "Enter Fullscreen",
         };
       case "TAB_HIDDEN":
         return {
-          title: "Learning Session Paused",
-          description:
-            "You switched to another browser tab. Telemetry timers and comprehension scoring have been frozen to protect your cognitive profile.",
-          actionText: "Resume Active Focus",
+          title: "Session Paused",
+          description: "You navigated away from this tab. Timers and comprehension tracking are paused.",
+          actionText: "Resume Session",
         };
       case "WINDOW_BLURRED":
         return {
-          title: "Window Focus Lost",
-          description:
-            "Another application or window pulled your operating system focus. Click back into this window to continue.",
-          actionText: "Re-focus Reader",
+          title: "Focus Paused",
+          description: "Another app took focus. Click below to return to your reading session.",
+          actionText: "Resume Reading",
         };
       default:
         return {
-          title: "Focus Interrupted",
-          description: "Click below to restore your deep-focus learning arena.",
-          actionText: "Restore Focus",
+          title: "Session Interrupted",
+          description: "Click below to restore your learning session.",
+          actionText: "Resume",
         };
     }
   };
@@ -63,50 +56,60 @@ export const FocusLockShield: React.FC<FocusLockShieldProps> = ({
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="focus-shield-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xl p-6 transition-all duration-300"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-2xl p-6 transition-all duration-300"
     >
-      <div className="relative max-w-lg w-full bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center shadow-2xl">
-        <div className="mx-auto w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-6">
-          <svg
-            className="w-8 h-8 text-indigo-400 animate-pulse"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
+      <AnimatedContent distance={20} duration={0.6} ease="power3.out" trigger="mount">
+        <div className="relative max-w-md w-full bg-white/[0.03] border border-white/10 rounded-3xl p-8 sm:p-10 text-center shadow-2xl backdrop-blur-xl space-y-6">
+          {/* Minimalist Outline Icon */}
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-slate-300">
+            <svg
+              className="w-7 h-7"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-            />
-          </svg>
+            >
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+            </svg>
+          </div>
+
+          <div className="space-y-2">
+            <h2
+              id="focus-shield-title"
+              className="text-xl sm:text-2xl font-semibold text-white tracking-tight"
+            >
+              {title}
+            </h2>
+            <p className="text-slate-400 text-xs sm:text-sm leading-relaxed font-light">
+              {description}
+            </p>
+          </div>
+
+          <div className="pt-2 flex justify-center">
+            <SpecularButton
+              size="lg"
+              radius={16}
+              tint="#ffffff"
+              tintOpacity={0.08}
+              textColor="#ffffff"
+              lineColor="#ffffff"
+              baseColor="#666666"
+              intensity={1.5}
+              idleIntensity={0.6}
+              thickness={1.8}
+              glow={1.3}
+              autoAnimate={true}
+              speed={0.4}
+              onClick={onRequestFullscreen}
+              className="w-full justify-center text-center"
+            >
+              {actionText}
+            </SpecularButton>
+          </div>
         </div>
-
-        <h2
-          id="focus-shield-title"
-          className="text-2xl font-bold text-white tracking-tight mb-3"
-        >
-          {title}
-        </h2>
-
-        <p className="text-slate-400 text-sm leading-relaxed mb-8">
-          {description}
-        </p>
-
-        <button
-          onClick={onRequestFullscreen}
-          type="button"
-          className="w-full inline-flex items-center justify-center px-6 py-3.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-500/25 transition-all duration-200 cursor-pointer"
-        >
-          {actionText}
-        </button>
-
-        <div className="mt-6 flex items-center justify-center gap-2 text-xs text-slate-400 font-mono">
-          <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-          <span>Telemetry & XP Accumulation Frozen</span>
-        </div>
-      </div>
+      </AnimatedContent>
     </div>
   );
 };
-

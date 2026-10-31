@@ -89,16 +89,16 @@ const CodeWindow: React.FC<CodeWindowProps> = ({ language, code }) => {
   };
 
   return (
-    <div className="my-5 rounded-2xl border border-slate-800 bg-slate-950 overflow-hidden shadow-2xl">
+    <div className="my-5 rounded-2xl border border-white/10 bg-black/60 backdrop-blur-xl overflow-hidden shadow-2xl">
       {/* Code Window Header Bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900/90 border-b border-slate-800 text-xs">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-white/[0.03] border-b border-white/[0.08] text-xs">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
             <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
           </div>
-          <span className="font-mono uppercase font-bold text-[11px] text-slate-400 pl-2">
+          <span className="font-mono uppercase font-medium text-[11px] text-slate-400 pl-2">
             {language || "CODE"}
           </span>
         </div>
@@ -106,32 +106,29 @@ const CodeWindow: React.FC<CodeWindowProps> = ({ language, code }) => {
         <button
           onClick={handleCopy}
           type="button"
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer text-[11px] font-medium"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 hover:text-white transition cursor-pointer text-[11px] font-normal"
           title="Copy code to clipboard"
         >
           {copied ? (
-            <>
-              <span className="text-emerald-400">✓</span>
-              <span className="text-emerald-400 font-semibold">Copied!</span>
-            </>
+            <span className="text-emerald-400 font-medium">Copied</span>
           ) : (
             <>
               <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  strokeWidth="2"
+                  strokeWidth="1.75"
                   d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
                 />
               </svg>
-              <span>Copy code</span>
+              <span>Copy</span>
             </>
           )}
         </button>
       </div>
 
       {/* Code Body */}
-      <pre className="p-4 overflow-x-auto font-mono text-xs sm:text-sm text-slate-200 leading-relaxed selection:bg-indigo-500/30">
+      <pre className="p-4 overflow-x-auto font-mono text-xs sm:text-sm text-slate-200 leading-relaxed selection:bg-purple-500/30">
         <code>{highlightSyntax(cleanCode, language)}</code>
       </pre>
     </div>
@@ -206,7 +203,7 @@ function renderFormattedText(rawText: string): React.ReactNode[] {
     // Heading 2
     if (trimmed.startsWith("## ")) {
       return (
-        <h2 key={pIdx} className="text-xl font-bold text-white tracking-tight pt-3 border-b border-slate-900 pb-2">
+        <h2 key={pIdx} className="text-xl font-bold text-white tracking-tight pt-3 border-b border-white/10 pb-2">
           {parseInlineFormatting(trimmed.replace(/^##\s+/, ""))}
         </h2>
       );
@@ -225,7 +222,7 @@ function renderFormattedText(rawText: string): React.ReactNode[] {
     }
 
     return (
-      <p key={pIdx} className="text-slate-200 leading-relaxed text-sm sm:text-base">
+      <p key={pIdx} className="text-slate-200 leading-relaxed text-sm sm:text-base font-light">
         {parseInlineFormatting(trimmed)}
       </p>
     );
@@ -243,7 +240,7 @@ function parseInlineFormatting(text: string): React.ReactNode[] {
       return (
         <code
           key={idx}
-          className="px-1.5 py-0.5 mx-0.5 rounded-md bg-slate-900 border border-slate-800 text-indigo-300 font-mono text-[12px] font-semibold"
+          className="px-1.5 py-0.5 mx-0.5 rounded-md bg-white/[0.08] border border-white/10 text-white font-mono text-[12px]"
         >
           {part.slice(1, -1)}
         </code>
@@ -251,7 +248,7 @@ function parseInlineFormatting(text: string): React.ReactNode[] {
     }
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
-        <strong key={idx} className="font-bold text-white">
+        <strong key={idx} className="font-semibold text-white">
           {part.slice(2, -2)}
         </strong>
       );
