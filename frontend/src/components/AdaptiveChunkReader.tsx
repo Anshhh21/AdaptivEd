@@ -5,6 +5,7 @@ import { useAttentionTracker } from "../hooks/useAttentionTracker";
 import { useChunkTelemetry } from "../hooks/useChunkTelemetry";
 import { useFullscreenLock } from "../hooks/useFullscreenLock";
 import { BCSEvaluationResponse, ChunkTelemetryPayload, CognitiveState } from "../types/telemetry";
+import { DeveloperXRayDrawer } from "./DeveloperXRayDrawer";
 import { FocusLockShield } from "./FocusLockShield";
 
 export interface SemanticChunkData {
@@ -50,6 +51,7 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
   const [activeChunkIndex, setActiveChunkIndex] = useState<number>(0);
   const [activeViewMode, setActiveViewMode] = useState<"ORIGINAL" | "ADAPTED">("ORIGINAL");
   const [activeEvaluation, setActiveEvaluation] = useState<BCSEvaluationResponse | null>(null);
+  const [isXRayOpen, setIsXRayOpen] = useState<boolean>(false);
 
   // Speed-Check Intercept State
   const [isSpeedCheckOpen, setIsSpeedCheckOpen] = useState<boolean>(false);
@@ -349,6 +351,15 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
           </div>
         </div>
       )}
+      {/* 6. Developer X-Ray Drawer (Ctrl+Shift+D) */}
+      <DeveloperXRayDrawer
+        isOpen={isXRayOpen}
+        onToggle={() => setIsXRayOpen((prev) => !prev)}
+        telemetryPayload={livePayload}
+        evaluation={activeEvaluation}
+        targetDwellMs={currentChunk.target_dwell_ms}
+        fleschKincaidGrade={currentChunk.flesch_kincaid_grade}
+      />
     </div>
   );
 };
