@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
+import AnimatedContent from "../components/AnimatedContent";
 import { AdaptiveChunkReader } from "../components/AdaptiveChunkReader";
 import { AIStudyHub } from "../components/AIStudyHub";
 import { AuthModal, UserSession } from "../components/AuthModal";
@@ -228,42 +229,46 @@ export default function Home() {
         {!hasStarted ? (
           /* Landing Page: Center big bold AdaptivEd, statement line, and Specular "Get Started" button */
           <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-16 -mt-8">
-            <div className="max-w-3xl mx-auto flex flex-col items-center space-y-7">
-              {/* Big Bold AdaptivEd Title */}
-              <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-extrabold tracking-tight text-white select-none drop-shadow-2xl">
-                AdaptivEd
-              </h1>
+            <AnimatedContent distance={30} duration={0.8} ease="power3.out" trigger="mount">
+              <div className="max-w-3xl mx-auto flex flex-col items-center space-y-7">
+                {/* Big Bold AdaptivEd Title */}
+                <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl font-extrabold tracking-tight text-white select-none drop-shadow-2xl">
+                  AdaptivEd
+                </h1>
 
-              {/* Subtitle Statement */}
-              <p className="max-w-xl text-slate-300/90 text-sm sm:text-base md:text-lg font-light leading-relaxed tracking-wide">
-                Learn in a new way by your own capacity, so that learning is fun
-                again with the help of AI.
-              </p>
+                {/* Subtitle Statement */}
+                <p className="max-w-xl text-slate-300/90 text-sm sm:text-base md:text-lg font-light leading-relaxed tracking-wide">
+                  Learn in a new way by your own capacity, so that learning is fun
+                  again with the help of AI.
+                </p>
 
-              {/* SpecularButton from React Bits */}
-              <div className="pt-4">
-                <SpecularButton
-                  size="lg"
-                  radius={18}
-                  tint="#ffffff"
-                  tintOpacity={0.06}
-                  textColor="#f5f5f5"
-                  lineColor="#ffffff"
-                  baseColor="#525252"
-                  intensity={1}
-                  idleIntensity={0.35}
-                  shineSize={10}
-                  shineFade={34}
-                  thickness={1.2}
-                  glow={1}
-                  followMouse
-                  proximity={250}
-                  onClick={() => setHasStarted(true)}
-                >
-                  Get Started
-                </SpecularButton>
+                {/* SpecularButton from React Bits */}
+                <div className="pt-4">
+                  <SpecularButton
+                    size="lg"
+                    radius={18}
+                    tint="#ffffff"
+                    tintOpacity={0.06}
+                    textColor="#f5f5f5"
+                    lineColor="#ffffff"
+                    baseColor="#666666"
+                    intensity={1.5}
+                    idleIntensity={0.6}
+                    shineSize={18}
+                    shineFade={40}
+                    thickness={2.0}
+                    glow={1.4}
+                    autoAnimate={true}
+                    speed={0.4}
+                    followMouse={true}
+                    proximity={250}
+                    onClick={() => setHasStarted(true)}
+                  >
+                    Get Started
+                  </SpecularButton>
+                </div>
               </div>
-            </div>
+            </AnimatedContent>
           </div>
         ) : (
           /* AI Learning Hub / Workstation (Opened upon clicking Get Started) */
