@@ -32,6 +32,20 @@ class BYOCIngestionResult(AppBaseModel):
     chunks: list = Field(default_factory=list)
 
 
+class IngestUrlRequest(AppBaseModel):
+    url: str
+    title: Optional[str] = None
+    user_level: float = 6.5
+    learning_strategy: str = "DIFFICULTY_FIRST"
+
+
+class IngestNotesRequest(AppBaseModel):
+    raw_text: str
+    title: Optional[str] = None
+    user_level: float = 6.5
+    learning_strategy: str = "DIFFICULTY_FIRST"
+
+
 def _slugify(text: str) -> str:
     """Generates an SEO-safe URL slug from title."""
     cleaned = re.sub(r"[^\w\s-]", "", text.lower()).strip()
@@ -386,61 +400,15 @@ def _fallback_heuristic_synthesis(raw_text: str, fallback_title: str) -> dict:
     }
 
 
-@router.post("/byoc/upload", response_model=ResponseEnvelope[BYOCIngestionResult], tags=["BYOC"])
-async def ingest_and_synthesize_content(
-    file: Optional[UploadFile] = File(default=None, description="PDF, PPT/PPTX, Markdown (.md), or Text (.txt) file."),
-    url_input: Optional[str] = Form(default=None, description="External article or documentation URL (e.g. W3Schools, GfG)."),
-    raw_text_input: Optional[str] = Form(default=None, description="Direct text notes or lecture slides pasted by user."),
-    title: Optional[str] = Form(default=None, description="Optional custom title for the course."),
-    wpm_baseline: float = Form(default=220.0, ge=80.0, le=600.0),
-    comprehension_level: float = Form(default=6.5, ge=1.0, le=10.0, description="Learner 1.0 - 10.0 understanding level"),
-    learning_strategy: str = Form(default="DIFFICULTY_FIRST", description="'DIFFICULTY_FIRST' or 'TIME_FIRST'"),
-) -> ResponseEnvelope[BYOCIngestionResult]:
-    """
-    Intelligent BYOC Ingestion Pipeline:
-    1. Ingests content from URL, Document (PDF, PPTX, MD, TXT), or raw notes.
-    2. Uses AI (Groq LLaMA/GPT-OSS) to filter out noise, acknowledgments, and cover sheets.
-    3. Synthesizes a structured topic-by-topic course with in-depth explanations and verification checks.
-    4. Persists the Lesson and SemanticChunk documents in MongoDB Atlas.
-    """
-    raw_text = ""
-    source_name = "Custom Material"
-
-    # 1. Handle URL Ingestion
-    if url_input and url_input.strip().startswith("http"):
-        source_name = url_input.strip()
-        raw_text = await _fetch_url_content(url_input.strip())
-        if not title:
-            # Derive title from domain or slug
-            title = re.sub(r"https?://(www\.)?", "", url_input.strip()).split("/")[0].capitalize() + " Course"
-
-    # 2. Handle File Uploads (PDF, PPTX, MD, TXT)
-    elif file is not None and file.filename:
-        filename = file.filename
-        source_name = filename
-        raw_bytes = await file.read()
-        if raw_bytes:
-            file_ext = filename.lower().split(".")[-1]
-            if file_ext == "pdf":
-                raw_text = _extract_text_from_pdf(raw_bytes)
-            elif file_ext in ["pptx", "ppt"]:
-                raw_text = _extract_text_from_pptx(raw_bytes)
-            else:
-                try:
-                    raw_text = raw_bytes.decode("utf-8")
-                except UnicodeDecodeError:
-                    raw_text = raw_bytes.decode("latin-1", errors="replace")
-
-            if not title:
-                title = re.sub(r"\.[^.]+$", "", filename).replace("_", " ").replace("-", " ").title()
-
-    # 3. Handle Raw Notes Paste
-    elif raw_text_input and raw_text_input.strip():
-        raw_text = raw_text_input.strip()
-        source_name = "Pasted Notes"
-        if not title:
-            title = "Custom Notes Study Track"
-
+async def _process_and_persist_course(
+    raw_text: str,
+    source_name: str,
+    title: Optional[str] = None,
+    comprehension_level: float = 6.5,
+    learning_strategy: str = "DIFFICULTY_FIRST",
+    wpm_baseline: float = 220.0,
+) -> dict:
+    """Core synthesis and MongoDB persistence pipeline for all ingestion forms."""
     if len(raw_text.strip()) < 50:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -560,21 +528,142 @@ async def ingest_and_synthesize_content(
             }
         )
 
-    result_payload = BYOCIngestionResult(
-        lesson_id=str(lesson.id),
-        slug=slug,
-        title=course_title,
-        track_tier=TrackTier.BYOC_SANDBOX,
-        total_chunks=len(synthesized_topics),
-        total_words=total_words,
-        average_complexity=9.5,
-        chunking_strategy="groq-openai/gpt-oss-120b-synthesizer",
-        chunks=serialized_chunks,
-        status_message=f"Successfully synthesized '{course_title}' into {len(synthesized_topics)} intelligent topic modules.",
+    response_payload = {
+        "success": True,
+        "module_id": str(lesson.id),
+        "lesson_id": str(lesson.id),
+        "slug": slug,
+        "title": course_title,
+        "description": course_desc,
+        "estimated_minutes": lesson.estimated_duration_minutes,
+        "total_chunks": len(synthesized_topics),
+        "total_words": total_words,
+        "chunks": serialized_chunks,
+        "status_message": f"Successfully synthesized '{course_title}' into {len(synthesized_topics)} intelligent topic modules.",
+        "data": {
+            "module_id": str(lesson.id),
+            "lesson_id": str(lesson.id),
+            "slug": slug,
+            "title": course_title,
+            "description": course_desc,
+            "estimated_minutes": lesson.estimated_duration_minutes,
+            "total_chunks": len(synthesized_topics),
+            "total_words": total_words,
+            "chunks": serialized_chunks,
+        },
+    }
+    return response_payload
+
+
+@router.post("/byoc/ingest-url", tags=["BYOC"])
+async def ingest_url(payload: IngestUrlRequest):
+    """Ingests content from a web URL and synthesizes an adaptive course."""
+    raw_text = await _fetch_url_content(payload.url.strip())
+    title = payload.title
+    if not title:
+        title = re.sub(r"https?://(www\.)?", "", payload.url.strip()).split("/")[0].capitalize() + " Course"
+    return await _process_and_persist_course(
+        raw_text=raw_text,
+        source_name=payload.url.strip(),
+        title=title,
+        comprehension_level=payload.user_level,
+        learning_strategy=payload.learning_strategy,
     )
 
-    return ResponseEnvelope(
-        success=True,
-        data=result_payload,
-        message="AI course successfully created from your content.",
+
+@router.post("/byoc/ingest-notes", tags=["BYOC"])
+async def ingest_notes(payload: IngestNotesRequest):
+    """Ingests raw text notes and synthesizes an adaptive course."""
+    return await _process_and_persist_course(
+        raw_text=payload.raw_text.strip(),
+        source_name="Pasted Notes",
+        title=payload.title or "Custom Notes Study Track",
+        comprehension_level=payload.user_level,
+        learning_strategy=payload.learning_strategy,
+    )
+
+
+@router.post("/byoc/ingest-document", tags=["BYOC"])
+async def ingest_document(
+    file: UploadFile = File(..., description="PDF, PPT/PPTX, Markdown (.md), or Text (.txt) file."),
+    title: Optional[str] = Form(default=None),
+    user_level: float = Form(default=6.5),
+    learning_strategy: str = Form(default="DIFFICULTY_FIRST"),
+):
+    """Ingests an uploaded document and synthesizes an adaptive course."""
+    filename = file.filename or "Uploaded Document"
+    raw_bytes = await file.read()
+    raw_text = ""
+    if raw_bytes:
+        file_ext = filename.lower().split(".")[-1]
+        if file_ext == "pdf":
+            raw_text = _extract_text_from_pdf(raw_bytes)
+        elif file_ext in ["pptx", "ppt"]:
+            raw_text = _extract_text_from_pptx(raw_bytes)
+        else:
+            try:
+                raw_text = raw_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                raw_text = raw_bytes.decode("latin-1", errors="replace")
+
+    resolved_title = title or re.sub(r"\.[^.]+$", "", filename).replace("_", " ").replace("-", " ").title()
+
+    return await _process_and_persist_course(
+        raw_text=raw_text,
+        source_name=filename,
+        title=resolved_title,
+        comprehension_level=user_level,
+        learning_strategy=learning_strategy,
+    )
+
+
+@router.post("/byoc/upload", tags=["BYOC"])
+async def ingest_and_synthesize_content(
+    file: Optional[UploadFile] = File(default=None, description="PDF, PPT/PPTX, Markdown (.md), or Text (.txt) file."),
+    url_input: Optional[str] = Form(default=None, description="External article or documentation URL (e.g. W3Schools, GfG)."),
+    raw_text_input: Optional[str] = Form(default=None, description="Direct text notes or lecture slides pasted by user."),
+    title: Optional[str] = Form(default=None, description="Optional custom title for the course."),
+    wpm_baseline: float = Form(default=220.0, ge=80.0, le=600.0),
+    comprehension_level: float = Form(default=6.5, ge=1.0, le=10.0, description="Learner 1.0 - 10.0 understanding level"),
+    learning_strategy: str = Form(default="DIFFICULTY_FIRST", description="'DIFFICULTY_FIRST' or 'TIME_FIRST'"),
+):
+    """Legacy BYOC upload endpoint for backwards compatibility."""
+    raw_text = ""
+    source_name = "Custom Material"
+
+    if url_input and url_input.strip().startswith("http"):
+        source_name = url_input.strip()
+        raw_text = await _fetch_url_content(url_input.strip())
+        if not title:
+            title = re.sub(r"https?://(www\.)?", "", url_input.strip()).split("/")[0].capitalize() + " Course"
+    elif file is not None and file.filename:
+        filename = file.filename
+        source_name = filename
+        raw_bytes = await file.read()
+        if raw_bytes:
+            file_ext = filename.lower().split(".")[-1]
+            if file_ext == "pdf":
+                raw_text = _extract_text_from_pdf(raw_bytes)
+            elif file_ext in ["pptx", "ppt"]:
+                raw_text = _extract_text_from_pptx(raw_bytes)
+            else:
+                try:
+                    raw_text = raw_bytes.decode("utf-8")
+                except UnicodeDecodeError:
+                    raw_text = raw_bytes.decode("latin-1", errors="replace")
+        if not title:
+            title = re.sub(r"\.[^.]+$", "", filename).replace("_", " ").replace("-", " ").title()
+    elif raw_text_input and raw_text_input.strip():
+        raw_text = raw_text_input.strip()
+        source_name = "Pasted Notes"
+        if not title:
+            title = "Custom Notes Study Track"
+
+    return await _process_and_persist_course(
+        raw_text=raw_text,
+        source_name=source_name,
+        title=title,
+        comprehension_level=comprehension_level,
+        learning_strategy=learning_strategy,
+        wpm_baseline=wpm_baseline,
     )

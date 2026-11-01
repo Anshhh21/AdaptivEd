@@ -162,24 +162,25 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
 
       setLoadingStep("Formatting topic modules and understanding checkpoints...");
       const result = await response.json();
+      const resData = result.data || result;
 
       const newTopic: TopicModule = {
-        id: result.module_id || `byoc_${Date.now()}`,
-        slug: result.slug || `topic_${Date.now()}`,
-        title: result.title || customTitle || "Personal Course",
-        shortDescription: result.description || "Synthesized adaptive material.",
-        estimatedMinutes: result.estimated_minutes || 45,
-        chunks: result.chunks.map((c: any, index: number): SemanticChunkData => {
-          const checkpoint = (c.interactive_checkpoints || [])[0] || null;
+        id: resData.lesson_id || resData.module_id || `byoc_${Date.now()}`,
+        slug: resData.slug || `topic_${Date.now()}`,
+        title: resData.title || customTitle || "Personal Course",
+        shortDescription: resData.description || resData.status_message || "Synthesized adaptive material.",
+        estimatedMinutes: resData.estimated_minutes || 45,
+        chunks: (resData.chunks || []).map((c: any, index: number): SemanticChunkData => {
+          const checkpoint = c.speed_check || (c.interactive_checkpoints || [])[0] || null;
           return {
-            id: c.chunk_id || `chunk_${index}`,
+            id: c.id || c.chunk_id || `chunk_${index}`,
             chunk_index: index,
             title: c.title || `Part ${index + 1}`,
             content: c.content || "",
-            sentence_count: (c.content || "").split(/[.?!]/).filter(Boolean).length || 5,
-            word_count: (c.content || "").split(/\s+/).filter(Boolean).length || 150,
-            flesch_kincaid_grade: 8.5,
-            target_dwell_ms: (c.read_time_seconds || 180) * 1000,
+            sentence_count: c.sentence_count || (c.content || "").split(/[.?!]/).filter(Boolean).length || 5,
+            word_count: c.word_count || (c.content || "").split(/\s+/).filter(Boolean).length || 150,
+            flesch_kincaid_grade: c.flesch_kincaid_grade || 8.5,
+            target_dwell_ms: c.target_dwell_ms || (c.read_time_seconds || 180) * 1000,
             speed_check: checkpoint
               ? {
                   question: checkpoint.prompt || checkpoint.question || "Quick concept check:",
@@ -188,6 +189,7 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
                   explanation: checkpoint.explanation || "Concept verification checkpoint.",
                 }
               : null,
+            cached_adaptations: c.cached_adaptations || undefined,
           };
         }),
       };
