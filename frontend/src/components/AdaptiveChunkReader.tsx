@@ -93,16 +93,19 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
   // Focus Lock Hook
   const { isLockedInFocus, blockReason, requestFullscreenLock } = useFullscreenLock();
 
-  // Local MediaPipe 2-FPS Vision Attention Tracker
+  // Local 2-FPS Vision Attention Tracker
   const {
     videoRef,
     attentionScore,
     faceDetected,
+    outOfFrame,
     isTracking,
     hasCameraPermission,
     requestCameraAccess,
     stopTracking,
   } = useAttentionTracker(true);
+
+  const [inlineSkimmingWarning, setInlineSkimmingWarning] = useState<Record<number, string>>({});
 
   const currentChunk = chunks[activeChunkIndex] || null;
 
@@ -225,17 +228,46 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
 
     const isCorrect = selected === speedCheck.correct_option_index;
     const dwellSeconds = Math.max(1, Math.round((Date.now() - chunkStartTimeRef.current) / 1000));
+    const wordCount = currentChunk?.word_count || 100;
+    // Human reading speed benchmark: 450 WPM upper human threshold
+    const minDwellSeconds = Math.max(5, Math.round((wordCount / 450) * 60));
+    const isSkimming = dwellSeconds < minDwellSeconds;
 
     setInlineVerified((prev) => ({ ...prev, [activeChunkIndex]: true }));
-    if (isCorrect) {
+
+    // Only mark chunk as passed if correct AND NOT skimming
+    if (isCorrect && !isSkimming) {
       setPassedChunks((prev) => ({ ...prev, [activeChunkIndex]: true }));
+      setInlineSkimmingWarning((prev) => {
+        const next = { ...prev };
+        delete next[activeChunkIndex];
+        return next;
+      });
+    } else if (isSkimming) {
+      // Skimming detected: display prominent pacing guardrail alert
+      setInlineSkimmingWarning((prev) => ({
+        ...prev,
+        [activeChunkIndex]: isCorrect
+          ? `⚠️ Rapid Skimming Intercept: Finished in ${dwellSeconds}s for ${wordCount} words (minimum required: ${minDwellSeconds}s). Capability score increase denied (+0.0). Please read thoroughly to build genuine mastery.`
+          : `⚠️ Blind Skimming Penalty (-0.5): Answered incorrectly in only ${dwellSeconds}s without reading (${wordCount} words). A -0.5 capability penalty has been deducted. Take time to read before answering.`,
+      }));
+    } else {
+      setInlineSkimmingWarning((prev) => {
+        const next = { ...prev };
+        delete next[activeChunkIndex];
+        return next;
+      });
     }
 
     setInlineFeedback((prev) => ({
       ...prev,
       [activeChunkIndex]: {
         isCorrect,
-        text: isCorrect
+        text: isSkimming
+          ? isCorrect
+            ? `⚠️ Skimming Detected! You answered in ${dwellSeconds}s (expected >= ${minDwellSeconds}s). Score increase denied (+0.0). Take time to read before advancing.`
+            : `⚠️ Blind Guessing Penalty (-0.5)! Incorrect answer after only ${dwellSeconds}s of reading. Correct answer is Option ${speedCheck.correct_option_index + 1}: "${speedCheck.options[speedCheck.correct_option_index]}". ${speedCheck.explanation}`
+          : isCorrect
           ? `Verified. ${speedCheck.explanation}`
           : `Review needed. Correct answer is Option ${speedCheck.correct_option_index + 1}: "${speedCheck.options[speedCheck.correct_option_index]}". ${speedCheck.explanation}`,
       },
@@ -251,11 +283,13 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
           lesson_id: currentChunk?.id || `chunk-${activeChunkIndex}`,
           track_id: lessonId,
           topic_title: currentChunk?.title || lessonTitle,
-          xp_earned: isCorrect ? 50 : 10,
-          bcs_score: isCorrect ? 0.95 : 0.45,
+          xp_earned: isCorrect ? (isSkimming ? 0 : 50) : 0,
+          bcs_score: isCorrect ? (isSkimming ? 0.5 : 0.95) : 0.2,
           quiz_passed: isCorrect,
           dwell_time_seconds: dwellSeconds,
-          struggle_signals: isCorrect ? 0 : 1,
+          struggle_signals: isCorrect ? (isSkimming ? 1 : 0) : 2,
+          is_skimming: isSkimming,
+          word_count: wordCount,
         }),
       });
 
@@ -263,12 +297,13 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
       if (json.success && json.data) {
         const { comprehension_score, previous_score, score_delta, feedback } = json.data;
         if (comprehension_score !== undefined) {
-          const deltaVal = score_delta ?? (isCorrect ? 0.3 : -0.3);
+          const defaultDelta = isSkimming ? (isCorrect ? 0.0 : -0.5) : (isCorrect ? 0.3 : -0.3);
+          const deltaVal = score_delta ?? defaultDelta;
           setComprehensionToast({
             previousScore: previous_score ?? 6.5,
             newScore: comprehension_score,
             delta: deltaVal,
-            feedback: feedback ?? (isCorrect ? "+0.3 Level Up" : "Calibrating simpler analogies (-0.3)"),
+            feedback: feedback ?? (isSkimming ? (isCorrect ? "Skimming: Level up denied (+0.0)" : "Blind Guessing Penalty (-0.5)") : (isCorrect ? "+0.3 Level Up" : "Calibrating simpler analogies (-0.3)")),
           });
 
           // Sync local storage session
@@ -462,6 +497,24 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
               </div>
             </div>
 
+            {/* Attention Out-of-POV Alert */}
+            {isTracking && outOfFrame && (
+              <div className="p-4 rounded-2xl bg-rose-950/80 border-2 border-rose-500/80 backdrop-blur-md text-rose-200 text-xs flex items-center justify-between gap-3 shadow-lg shadow-rose-950/50 animate-pulse">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-lg shrink-0">⚠️</span>
+                  <div>
+                    <div className="font-semibold text-rose-100">Attention Alert: Face Not Detected</div>
+                    <div className="text-[11px] text-rose-300/90 font-light">
+                      You have moved out of camera POV or looked away. Please face the screen to maintain active focus tracking.
+                    </div>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-rose-500/20 text-[10px] font-mono text-rose-300 border border-rose-500/40 whitespace-nowrap shrink-0">
+                  0% Focus • Out of POV
+                </span>
+              </div>
+            )}
+
             {/* Adaptive Assistance Notice */}
             {isAdaptiveAssistanceActive && (
               <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 backdrop-blur-md text-slate-300 text-xs flex items-center justify-between">
@@ -654,6 +707,19 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
                   })}
                 </div>
 
+                {/* Skimming Warning Alert */}
+                {inlineSkimmingWarning[activeChunkIndex] && (
+                  <div className="p-4 rounded-2xl text-xs font-light leading-relaxed border bg-rose-950/40 border-rose-500/50 text-rose-200 flex items-start gap-2.5 animate-fadeIn">
+                    <span className="text-base shrink-0">⚠️</span>
+                    <div className="space-y-0.5">
+                      <div className="font-semibold text-rose-100">Pacing Guardrail: Skimming Detected</div>
+                      <div className="text-[11px] text-rose-300/90 leading-relaxed font-light">
+                        {inlineSkimmingWarning[activeChunkIndex]}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Feedback Alert */}
                 {inlineFeedback[activeChunkIndex] && (
                   <div
@@ -759,6 +825,7 @@ export const AdaptiveChunkReader: React.FC<AdaptiveChunkReaderProps> = ({
         hasCameraPermission={hasCameraPermission}
         attentionScore={attentionScore}
         faceDetected={faceDetected}
+        outOfFrame={outOfFrame}
         onRequestCamera={requestCameraAccess}
         onStopCamera={stopTracking}
       />

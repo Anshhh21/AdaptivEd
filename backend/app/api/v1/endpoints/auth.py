@@ -67,6 +67,8 @@ class ProgressUpdateRequest(BaseModel):
     dwell_time_seconds: float = Field(default=25.0, ge=0.0)
     struggle_signals: int = Field(default=0, ge=0, description="Mistakes or friction events")
     learning_strategy: Optional[str] = None
+    is_skimming: bool = Field(default=False, description="Whether learner answered faster than humanly readable")
+    word_count: Optional[int] = Field(default=None, description="Total word count in chunk")
 
 
 class AuthResponseData(BaseModel):
@@ -92,14 +94,37 @@ def calculate_comprehension_delta(
     struggle_signals: int,
     dwell_time_seconds: float,
     learning_strategy: str,
+    is_skimming: bool = False,
+    word_count: Optional[int] = None,
 ) -> tuple[float, str]:
     """
-    Computes real-time Comprehension Rating delta on 1.0 - 10.0 scale.
-    - If user struggles (errors/high friction), level adjusts down (-0.2 to -0.4) so subsequent content adapts simpler.
-    - If user demonstrates strong accuracy and healthy dwell time, level increases (+0.2 to +0.5).
-    - In TIME_FIRST mode, rewards fast accurate throughput.
+    Computes real-time Comprehension Rating delta on 1.0 - 10.0 scale with anti-skimming protection.
+    - If user answered too rapidly (skimming):
+        - If correct: 0.0 delta (no score increase), warning feedback.
+        - If incorrect: -0.5 delta (elevated blind guessing penalty), warning feedback.
+    - If healthy dwell time:
+        - If correct: +0.2 to +0.4 level-up.
+        - If incorrect: -0.3 standard calibration.
     """
-    if quiz_passed and struggle_signals == 0:
+    effective_words = word_count if (word_count and word_count > 0) else 100
+    # Minimum human reading threshold: 450 WPM upper limit
+    min_dwell = max(5.0, round((effective_words / 450.0) * 60.0))
+    detected_skimming = is_skimming or (dwell_time_seconds < min_dwell)
+
+    if detected_skimming:
+        if quiz_passed:
+            delta = 0.0
+            feedback = (
+                f"⚠️ Rapid Skimming Intercepted: Completed in {dwell_time_seconds:.0f}s for {effective_words} words "
+                f"(expected >= {int(min_dwell)}s). Score increase denied (+0.0) — read thoroughly to level up."
+            )
+        else:
+            delta = -0.5
+            feedback = (
+                f"⚠️ Blind Skimming Penalty (-0.5): Rapid incorrect answer in {dwell_time_seconds:.0f}s "
+                f"for {effective_words} words. Read the material thoroughly before answering."
+            )
+    elif quiz_passed and struggle_signals == 0:
         if learning_strategy == "TIME_FIRST" and dwell_time_seconds < 25:
             delta = 0.4
             feedback = "Rapid high-yield mastery verified! (+0.4 Level Up)"
@@ -412,16 +437,24 @@ async def update_learning_progress(payload: ProgressUpdateRequest) -> ResponseEn
 
             profile.total_xp += payload.xp_earned
 
-            # Calculate updated 1.0 - 10.0 comprehension score
+            # Calculate updated 1.0 - 10.0 comprehension score with skimming detection
             new_score, feedback = calculate_comprehension_delta(
                 current_score=old_score,
                 quiz_passed=payload.quiz_passed,
                 struggle_signals=payload.struggle_signals,
                 dwell_time_seconds=payload.dwell_time_seconds,
                 learning_strategy=active_strategy,
+                is_skimming=payload.is_skimming,
+                word_count=payload.word_count,
             )
             profile.comprehension_score = new_score
-            if payload.quiz_passed:
+
+            # Only increment total topics mastered if not skimmed
+            effective_words = payload.word_count if (payload.word_count and payload.word_count > 0) else 100
+            min_dwell = max(5.0, round((effective_words / 450.0) * 60.0))
+            is_skimming_detected = payload.is_skimming or (payload.dwell_time_seconds < min_dwell)
+
+            if payload.quiz_passed and not is_skimming_detected:
                 profile.total_topics_learned = getattr(profile, "total_topics_learned", 0) + 1
             if payload.learning_strategy:
                 profile.learning_strategy = payload.learning_strategy
@@ -442,7 +475,7 @@ async def update_learning_progress(payload: ProgressUpdateRequest) -> ResponseEn
             profile.comprehension_history.insert(0, audit_entry)
             profile.comprehension_history = profile.comprehension_history[:50]
 
-            if payload.quiz_passed:
+            if payload.quiz_passed and not is_skimming_detected:
                 if payload.track_id not in profile.tracks:
                     profile.tracks[payload.track_id] = TrackProgress(
                         track_id=payload.track_id,

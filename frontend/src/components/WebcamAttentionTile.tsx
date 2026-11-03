@@ -8,14 +8,15 @@ interface WebcamAttentionTileProps {
   hasCameraPermission: boolean;
   attentionScore: number | null;
   faceDetected: boolean;
+  outOfFrame?: boolean;
   onRequestCamera: () => Promise<boolean>;
   onStopCamera: () => void;
 }
 
 /**
  * WebcamAttentionTile Component
- * Floating Picture-in-Picture webcam viewport rendered directly on screen when enabled.
- * Reassures the student that attention tracking is active, fully local, and privacy-preserved.
+ * Floating Picture-in-Picture webcam viewport.
+ * Provides real-time focus feedback and prominent warnings when the learner leaves the camera POV.
  */
 export const WebcamAttentionTile: React.FC<WebcamAttentionTileProps> = ({
   videoRef,
@@ -23,6 +24,7 @@ export const WebcamAttentionTile: React.FC<WebcamAttentionTileProps> = ({
   hasCameraPermission,
   attentionScore,
   faceDetected,
+  outOfFrame = false,
   onRequestCamera,
   onStopCamera,
 }) => {
@@ -42,21 +44,38 @@ export const WebcamAttentionTile: React.FC<WebcamAttentionTileProps> = ({
     );
   }
 
+  const isWarning = outOfFrame;
+  const isHealthy = faceDetected && !outOfFrame;
+
   return (
     <div
-      className={`fixed bottom-6 left-6 z-30 rounded-2xl bg-slate-900/95 border border-slate-700/80 shadow-2xl backdrop-blur-xl transition-all duration-300 overflow-hidden ${
-        isMinimized ? "w-44 h-12 p-2 flex items-center justify-between" : "w-48 p-2.5 space-y-2"
-      }`}
+      className={`fixed bottom-6 left-6 z-30 rounded-2xl bg-slate-900/95 shadow-2xl backdrop-blur-xl transition-all duration-300 overflow-hidden ${
+        isWarning
+          ? "border-2 border-rose-500/90 shadow-rose-950/50"
+          : isHealthy
+          ? "border border-emerald-500/50 shadow-emerald-950/20"
+          : "border border-amber-500/50 shadow-amber-950/20"
+      } ${isMinimized ? "w-44 h-12 p-2 flex items-center justify-between" : "w-52 p-2.5 space-y-2"}`}
     >
       {/* Header Controls */}
       <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-300">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              faceDetected ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
-            }`}
-          ></span>
-          <span>{faceDetected ? "Focus Active" : "Detecting Face"}</span>
+        <div className="flex items-center gap-1.5 text-[11px] font-medium">
+          {isWarning ? (
+            <>
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+              <span className="text-rose-400 font-semibold">⚠️ No Face in Frame</span>
+            </>
+          ) : isHealthy ? (
+            <>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="text-emerald-400 font-medium">Focus Active</span>
+            </>
+          ) : (
+            <>
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              <span className="text-amber-300">Calibrating Focus...</span>
+            </>
+          )}
         </div>
 
         <div className="flex items-center gap-1">
@@ -88,9 +107,31 @@ export const WebcamAttentionTile: React.FC<WebcamAttentionTileProps> = ({
             className="w-full h-full object-cover -scale-x-100"
           />
 
+          {/* Out of POV Overlay Alert */}
+          {isWarning && (
+            <div className="absolute inset-0 bg-rose-950/75 backdrop-blur-[2px] flex flex-col items-center justify-center p-2 text-center pointer-events-none z-10 animate-fadeIn">
+              <span className="text-xs font-bold text-rose-200">Face Not Detected</span>
+              <span className="text-[10px] text-rose-300/90 leading-tight mt-0.5">
+                Look at the screen to resume focus tracking
+              </span>
+            </div>
+          )}
+
           {/* Attention Health Indicator */}
-          <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur text-[9px] font-mono text-emerald-300 border border-emerald-500/20">
-            {attentionScore !== null ? `${Math.round(attentionScore * 100)}% Focus` : "Calibrating"}
+          <div
+            className={`absolute bottom-1 right-1 px-1.5 py-0.5 rounded backdrop-blur text-[9px] font-mono z-20 ${
+              isWarning
+                ? "bg-rose-950/90 text-rose-300 border border-rose-500/50"
+                : isHealthy
+                ? "bg-black/75 text-emerald-300 border border-emerald-500/30"
+                : "bg-black/75 text-amber-300 border border-amber-500/30"
+            }`}
+          >
+            {isWarning
+              ? "0% Focus • Out of POV"
+              : attentionScore !== null
+              ? `${Math.round(attentionScore * 100)}% Focus`
+              : "Calibrating"}
           </div>
         </div>
       )}
@@ -103,4 +144,3 @@ export const WebcamAttentionTile: React.FC<WebcamAttentionTileProps> = ({
     </div>
   );
 };
-
