@@ -12,7 +12,7 @@ import { API_BASE_URL } from "../config/api";
 
 interface AIStudyHubProps {
   onSelectTopic: (topic: TopicModule, techName: string) => void;
-  onOpenArena: () => void;
+  onOpenArena?: () => void;
   userSession?: UserSession | null;
   onUpdateSession?: (session: UserSession) => void;
 }
@@ -570,13 +570,12 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
                 Built from the ground up for high-yield comprehension and verified skill mastery.
               </p>
             </div>
-            <button
-              onClick={onOpenArena}
-              className="text-xs text-purple-400 hover:text-purple-300 transition flex items-center gap-1 cursor-pointer font-medium"
-            >
-              <span>Verification Arena</span>
-              <span className="text-[10px]">→</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 font-medium">Verification Arena</span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono tracking-wide uppercase bg-purple-500/10 border border-purple-500/20 text-purple-300">
+                Coming Soon
+              </span>
+            </div>
           </div>
 
           <MagicBento
@@ -634,11 +633,10 @@ export const AIStudyHub: React.FC<AIStudyHubProps> = ({
               },
               {
                 id: 'arena',
-                label: 'Phase 6 Defense',
+                label: 'Coming Soon',
                 title: 'Proof-of-Work Arena',
-                description: 'Zero-clone audits and live AST vivas to catch vibe-coding.',
+                description: 'Autonomous zero-clone code audits and live viva verification (in development).',
                 visual: 'security',
-                onClick: onOpenArena,
               },
             ]}
           />

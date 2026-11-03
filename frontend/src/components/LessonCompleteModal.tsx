@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import SpecularButton from "./SpecularButton";
 
 interface LessonCompleteModalProps {
   isOpen: boolean;
@@ -8,13 +9,12 @@ interface LessonCompleteModalProps {
   xpEarned?: number;
   streakDays?: number;
   onReturnToCatalog: () => void;
-  onGoToArena: () => void;
 }
 
 /**
  * LessonCompleteModal Component
  * Fires when the learner completes all chunks of a lesson.
- * Awards XP, updates streaks, and provides clear routes back to the catalog or into the Arena.
+ * Awards XP, updates streaks, and provides a direct path back to courses.
  */
 export const LessonCompleteModal: React.FC<LessonCompleteModalProps> = ({
   isOpen,
@@ -22,7 +22,6 @@ export const LessonCompleteModal: React.FC<LessonCompleteModalProps> = ({
   xpEarned = 150,
   streakDays = 2,
   onReturnToCatalog,
-  onGoToArena,
 }) => {
   if (!isOpen) return null;
 
@@ -31,59 +30,71 @@ export const LessonCompleteModal: React.FC<LessonCompleteModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="lesson-complete-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xl p-6 transition-all duration-300"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-2xl p-6 transition-all duration-300"
     >
-      <div className="relative max-w-lg w-full bg-slate-900 border border-emerald-500/30 rounded-3xl p-8 text-center shadow-2xl space-y-6">
-        {/* Celebration Trophy Icon */}
-        <div className="mx-auto w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
-          <span className="text-4xl animate-bounce">🏆</span>
+      <div className="relative max-w-md w-full bg-white/[0.03] border border-white/10 rounded-3xl p-8 sm:p-10 text-center shadow-2xl backdrop-blur-xl space-y-6 animate-fadeIn">
+        {/* Minimalist Outline Trophy Icon */}
+        <div className="mx-auto w-16 h-16 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-emerald-400">
+          <svg
+            className="w-8 h-8"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+            <path d="M4 22h16" />
+            <path d="M10 14.66V17c0 .55-.45 1-1 1H7" />
+            <path d="M14 14.66V17c0 .55.45 1 1 1h2" />
+            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+          </svg>
         </div>
 
         <div className="space-y-2">
-          <div className="text-xs uppercase font-mono tracking-wider text-emerald-400 font-semibold">
-            Concept Module Mastered
+          <div className="text-xs uppercase font-mono tracking-wider text-emerald-400 font-medium">
+            Lesson Completed
           </div>
-          <h2 id="lesson-complete-title" className="text-2xl font-bold text-white tracking-tight">
+          <h2 id="lesson-complete-title" className="text-xl sm:text-2xl font-semibold text-white tracking-tight">
             {lessonTitle}
           </h2>
-          <p className="text-slate-400 text-xs max-w-sm mx-auto leading-relaxed">
-            Your dwell time and behavioral comprehension metrics have been validated and saved to your
-            persistent profile.
+          <p className="text-slate-400 text-xs sm:text-sm leading-relaxed font-light">
+            Your reading dwell metrics and verified comprehension score have been persisted to MongoDB Atlas.
           </p>
         </div>
 
-        {/* Rewards Summary */}
-        <div className="grid grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-950 border border-slate-800">
+        {/* Minimalist Stats Summary */}
+        <div className="grid grid-cols-2 gap-3 p-4 rounded-2xl bg-white/[0.02] border border-white/10">
           <div className="space-y-1">
             <div className="text-[11px] text-slate-400 font-mono">Cognitive XP</div>
-            <div className="text-xl font-bold text-emerald-400">+{xpEarned} XP</div>
+            <div className="text-lg font-medium text-emerald-400">+{xpEarned} XP</div>
           </div>
           <div className="space-y-1">
-            <div className="text-[11px] text-slate-400 font-mono">Focus Streak</div>
-            <div className="text-xl font-bold text-amber-400">{streakDays} Days 🔥</div>
+            <div className="text-[11px] text-slate-400 font-mono">Active Streak</div>
+            <div className="text-lg font-medium text-purple-300">{streakDays} Days</div>
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="space-y-3 pt-2">
-          <button
-            onClick={onGoToArena}
-            type="button"
-            className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/25 transition cursor-pointer"
-          >
-            Verify Skills in Proof-of-Work Arena →
-          </button>
-
-          <button
+        {/* Action Button: Return to Courses */}
+        <div className="pt-2 flex justify-center">
+          <SpecularButton
+            size="lg"
+            radius={16}
+            tint="#ffffff"
+            tintOpacity={0.08}
+            textColor="#ffffff"
+            lineColor="#ffffff"
+            baseColor="#666666"
+            intensity={1.3}
+            idleIntensity={0.5}
             onClick={onReturnToCatalog}
-            type="button"
-            className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white text-xs font-semibold transition cursor-pointer"
           >
-            Back to Course Catalog
-          </button>
+            Back to Courses
+          </SpecularButton>
         </div>
       </div>
     </div>
   );
 };
-

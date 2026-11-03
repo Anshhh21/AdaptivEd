@@ -283,7 +283,6 @@ export default function Home() {
             {currentView === "hub" && (
               <AIStudyHub
                 onSelectTopic={handleSelectTopic}
-                onOpenArena={() => setCurrentView("arena")}
                 userSession={userSession}
                 onUpdateSession={setUserSession}
               />
@@ -452,10 +451,6 @@ export default function Home() {
         onReturnToCatalog={() => {
           setIsCompleteOpen(false);
           setCurrentView("hub");
-        }}
-        onGoToArena={() => {
-          setIsCompleteOpen(false);
-          setCurrentView("arena");
         }}
       />
     </div>
